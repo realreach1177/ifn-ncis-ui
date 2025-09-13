@@ -1,21 +1,724 @@
-# Clone your empty repo
-git clone https://github.com/realreach1177/ifn-ncis-ui.git
-cd ifn-ncis-ui
-
-# Create index.html with sample content
-echo '<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Welcome to IFN-NCIS-UI</title>
+<meta charset="UTF-8" />
+<title>Connection Web UI - Live Sync</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
+<style>
+  html, body {
+    height:100%; margin:0; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden;
+  }
+  #ui {
+    position:fixed; top:8px; left:8px; right:8px; z-index:200000;
+    display:flex; flex-wrap: wrap; gap:6px;
+    max-width: calc(100vw - 16px);
+    user-select:none;
+    align-items: center;
+  }
+  #ui > * {
+    padding:6px 10px; border:none; border-radius:6px;
+    font-weight:600; cursor:pointer; font-size:14px; color:white;
+    min-width:48px; text-align:center;
+  }
+  #ui button {
+    background:#2b2b2b; transition: background 0.3s;
+  }
+  #ui button:hover {
+    filter: brightness(1.2);
+  }
+  #ui button#undoBtn { background:#009688; }
+  #ui button#undoBtn:hover { background:#00796b; }
+  #ui button#redoBtn { background:#ff9800; }
+  #ui button#redoBtn:hover { background:#ef6c00; }
+  #ui button#saveWebBtn { background:#4caf50; }
+  #ui button#saveWebBtn:hover { background:#388e3c; }
+  #ui button#loadWebBtn { background:#2196f3; }
+  #ui button#loadWebBtn:hover { background:#1976d2; }
+  #ui button#deleteWebBtn { background:#f44336; }
+  #ui button#deleteWebBtn:hover { background:#d32f2f; }
+  #ui button#deleteCardBtn { background:#e91e63; }
+  #ui button#deleteCardBtn:hover { background:#b0003a; }
+  #ui input[type="text"], #ui select {
+    background:#222; color:#eee; border-radius:6px; border:none;
+    padding:6px 10px; font-weight:600; font-size:14px;
+    min-width:150px; max-width:250px;
+  }
+  #ui input[type="text"]::placeholder {
+    color:#aaa;
+  }
+  /* Search bar to right */
+  #searchBox {
+    margin-left:auto;
+    min-width:200px;
+  }
+  #stage {
+    position:absolute; inset:0; background:#141414; cursor:grab;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+    background-size:40px 40px;
+  }
+  #viewport {
+    position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible;
+  }
+  #wires {
+    position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;
+  }
+  #cards {
+    position:absolute; left:0; top:0; width:100%; height:100%;
+  }
+  .card {
+    position:absolute; width:360px; padding:15px 20px; box-sizing:border-box;
+    background:#222; color:#e0e0e0; border-radius:10px; display:flex; align-items:flex-start;
+    user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
+  }
+  .card.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
+  .card.selected {
+    outline:3px solid #ffc107;
+    box-shadow:0 0 20px 4px #ffc107;
+  }
+  .img {
+    width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:18px;
+    border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6);
+  }
+  .info { flex:1; overflow:hidden; }
+  .name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
+  .rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
+  .bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
+  .status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
+  .alive { background:#4caf50; }
+  .dead { background:#e53935; }
+  .unknown { background:#212121; border:1.5px solid #78909c; }
+  .anchor {
+    position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333;
+    top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20;
+  }
+  .anchor.candidate { background:#66bb6a; }
+  #editor {
+    position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
+    box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto;
+  }
+  #editor header {
+    font-weight:900; font-size:18px; padding-bottom:12px;
+  }
+  #editor label {
+    font-size:12px; margin-top:10px; display:block; color:#bbb;
+  }
+  #editor input, #editor select, #editor textarea {
+    width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px;
+    font-size:14px;
+  }
+  #editor textarea { min-height:60px; }
+  #editor .btns {
+    margin-top:14px; display:flex; gap:10px;
+  }
+  #editor .btns button {
+    flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px;
+    background:#2196f3; color:#fff; transition: background 0.3s;
+  }
+  #editor .btns button:hover { background:#1769aa; }
+  #editor .btns button.save { background:#4caf50; }
+  #editor .btns button.save:hover { background:#388e3c; }
+  .file-list {
+    max-height:100px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px;
+  }
+  .file-list a {
+    color:#74b9ff; text-decoration:none;
+  }
+  .file-list a:hover {
+    text-decoration:underline;
+  }
+  .toast {
+    position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
+    box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.9; user-select:none; z-index:999999;
+    pointer-events:none;
+  }
+</style>
 </head>
 <body>
-    <h1>Welcome to IFN-NCIS-UI</h1>
-    <p>This is your new index.html page.</p>
-</body>
-</html>' > index.html
+<div id="ui">
+  <button id="undoBtn" title="Undo">Undo</button>
+  <button id="redoBtn" title="Redo">Redo</button>
+  <button id="saveWebBtn" title="Save Connection Web">Save Web</button>
+  <button id="deleteWebBtn" title="Delete Connection Web">Delete Web</button>
+  <input type="text" id="webNameInput" placeholder="Enter Connection Web Name" />
+  <select id="webListDropdown" title="Select Connection Web"></select>
+  <button id="deleteCardBtn" title="Delete Selected Card">Delete Card</button>
+  <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
+</div>
+<div id="stage">
+  <div id="viewport">
+    <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
+    <div id="cards"></div>
+  </div>
+</div>
+<div id="editor">
+  <header>Edit Profile</header>
+  <label>Profile Picture URL</label>
+  <input id="fImage" type="url" placeholder="https://..." />
+  <label>Name</label>
+  <input id="fName" type="text" />
+  <label>Status</label>
+  <select id="fStatus">
+    <option>Alive</option>
+    <option>Dead</option>
+    <option>Unknown</option>
+  </select>
+  <label>Branch</label>
+  <select id="fBranch"></select>
+  <label>Subbranch</label>
+  <input id="fSubbranch" type="text" />
+  <label>Rank</label>
+  <select id="fRank"></select>
+  <label>Short Description</label>
+  <textarea id="fDesc"></textarea>
+  <label>Related Files from Firebase</label>
+  <select id="fRelatedPick"></select>
+  <button id="btnAddRelated" type="button">Add</button>
+  <div id="relatedList" class="file-list"></div>
+  <label>Other Files (URL)</label>
+  <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <button id="btnAddOther" type="button">Add</button>
+  <div id="otherList" class="file-list"></div>
+  <div class="btns">
+    <button class="save" id="btnSave" type="button">Save</button>
+    <button id="btnCancel" type="button">Cancel</button>
+  </div>
+</div>
+<script>
+// ===== Firebase config - REPLACE with your real Firebase config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
+  authDomain: "ncis-intranet.firebaseapp.com",
+  databaseURL: "https://ncis-intranet-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "ncis-intranet",
+  storageBucket: "ncis-intranet.firebasestorage.app",
+  messagingSenderId: "1010993365309",
+  appId: "1:1010993365309:web:8c72db8c5d95c061adc554",
+  measurementId: "G-GLMXRGGSHX"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+auth.signInAnonymously().catch(console.error);
 
-# Add, commit, and push
-git add index.html
-git commit -m "Add starter index.html"
-git push origin main
+// ===== App State =====
+let cards = [];
+let edges = [];
+let selected = null;
+let scale = 1, tx = 0, ty = 0;
+
+const viewport = document.getElementById('viewport');
+const stage = document.getElementById('stage');
+const cardsLayer = document.getElementById('cards');
+const wiresLayer = document.getElementById('wires');
+
+const branchColors = {
+  "None": "#777777",
+  "United States Army": "#4caf50",
+  "United States Navy": "#2196f3",
+  "United States Marine Corps": "#fbc02d",
+  "United States Air Force": "#00bcd4",
+  "Taliban": "#ef6c00",
+  "Taliban Special Forces": "#b38800",
+  "Al-Qaeda": "#d7a857"
+};
+
+const rankLists = {
+  "None":["None"],
+  "United States Army": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"],
+  "United States Navy": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"],
+  "United States Marine Corps": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"],
+  "United States Air Force": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"],
+  "Taliban": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"],
+  "Taliban Special Forces": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"],
+  "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"]
+};
+
+// ===== Helper Functions =====
+function contrast(hex) {
+  hex = (hex || '').replace('#', '');
+  if (hex.length !== 6) return '#000';
+  const r = parseInt(hex.slice(0,2),16), g= parseInt(hex.slice(2,4),16), b= parseInt(hex.slice(4,6),16);
+  return ((r*299+g*587+b*114)/1000) >= 128 ? '#000' : '#fff';
+}
+function fileNameFromUrl(url) {
+  if(typeof url !== 'string') return '';
+  try {
+    let p = new URL(url).pathname;
+    return p.substring(p.lastIndexOf('/') + 1);
+  } catch {
+    return url.split('/').pop() || '';
+  }
+}
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => t.remove(), 300);
+  }, 1500);
+}
+function applyTransform(){
+  viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+}
+function clientToWorld(cx, cy){
+  const r=stage.getBoundingClientRect();
+  const sx=cx-r.left, sy=cy-r.top;
+  return { x: (sx - tx) / scale, y: (sy - ty) / scale };
+}
+function makeCardView(card) {
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.id = card.id;
+  c.style.left = card.x + 'px';
+  c.style.top = card.y + 'px';
+  c.style.setProperty('--branchGlow', card.data.branchColor || '#4caf50');
+  const d = card.data;
+  const barText = contrast(d.branchColor || '#777');
+  c.innerHTML = `
+    <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
+    <div class="info">
+      <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
+      <div class="rank">${d.rank || ''}</div>
+      <div class="bar" style="background:${d.branchColor};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
+      <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
+      <div class="desc">${d.desc || ''}</div>
+      <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
+        ${[...(d.relatedFiles||[]), ...(d.otherFiles||[])].map(u => `<li><a href="${u}" target="_blank">${fileNameFromUrl(u)}</a></li>`).join('')}
+      </ul>
+    </div>
+    <div class="anchor" title="Drag to link"></div>
+  `;
+  c.addEventListener('click', e => {
+    e.stopPropagation();
+    if(selected) document.getElementById(selected)?.classList.remove('selected');
+    selected = card.id;
+    c.classList.add('selected');
+    openEditor(card.id);
+  });
+
+  let dragging = false;
+  let offset = {x:0,y:0};
+  c.addEventListener('pointerdown', e => {
+    if(e.target.classList.contains('anchor')) return;
+    dragging=true;
+    c.classList.add('dragging');
+    c.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - card.x;
+    offset.y = wp.y - card.y;
+  });
+  c.addEventListener('pointerup', e => {
+    dragging=false;
+    c.classList.remove('dragging');
+    c.releasePointerCapture(e.pointerId);
+    snapshot();
+  });
+  c.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    card.x = wp.x - offset.x;
+    card.y = wp.y - offset.y;
+    c.style.left = card.x + 'px';
+    c.style.top = card.y + 'px';
+    updateEdges();
+  });
+
+  cardsLayer.appendChild(c);
+  return c;
+}
+function makeEdgeView(edge) {
+  const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  ln.setAttribute("stroke", "#fff");
+  ln.setAttribute("stroke-opacity", "0.95");
+  ln.setAttribute("stroke-width", "3");
+  ln.dataset.eid = edge.id;
+  wiresLayer.appendChild(ln);
+  return ln;
+}
+function anchorCenter(cardId) {
+  const cardEl = document.getElementById(cardId);
+  if (!cardEl) return null;
+  const anchor = cardEl.querySelector(".anchor");
+  if (!anchor) return null;
+  const rect = anchor.getBoundingClientRect();
+  const stageRect = stage.getBoundingClientRect();
+  return {
+    x: (rect.left + rect.width / 2 - stageRect.left - tx) / scale,
+    y: (rect.top + rect.height / 2 - stageRect.top - ty) / scale,
+  };
+}
+function updateEdge(edge) {
+  const start = anchorCenter(edge.a.card);
+  const end = anchorCenter(edge.b.card);
+  if (!start || !end) return;
+  const line = wiresLayer.querySelector(`line[data-eid="${edge.id}"]`);
+  if (!line) return;
+  line.setAttribute("x1", start.x);
+  line.setAttribute("y1", start.y);
+  line.setAttribute("x2", end.x);
+  line.setAttribute("y2", end.y);
+}
+function updateEdges() {
+  edges.forEach(updateEdge);
+}
+function render() {
+  cardsLayer.innerHTML = '';
+  wiresLayer.innerHTML = '';
+  cards.forEach(makeCardView);
+  edges.forEach(makeEdgeView);
+  updateEdges();
+  applyTransform();
+}
+function snapshot() {
+  undoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
+  redoStack = [];
+}
+function undo() {
+  if(undoStack.length === 0){
+    alert("Nothing to undo");
+    return;
+  }
+  redoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
+  const state = undoStack.pop();
+  loadState(state);
+  render();
+  toast("Undo");
+}
+function redo() {
+  if(redoStack.length === 0){
+    alert("Nothing to redo");
+    return;
+  }
+  undoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
+  const state = redoStack.pop();
+  loadState(state);
+  render();
+  toast("Redo");
+}
+function loadState(state) {
+  cards.splice(0, cards.length, ...state.cards);
+  edges.splice(0, edges.length, ...state.edges);
+  tx = state.tx;
+  ty = state.ty;
+  scale = state.scale;
+  applyTransform();
+}
+function deselect() {
+  if(selected){
+    let el = document.getElementById(selected);
+    if(el) el.classList.remove("selected");
+    selected = null;
+  }
+  closeEditor();
+}
+function closeEditor() {
+  document.getElementById("editor").style.display = "none";
+}
+function openEditor(id){
+  let ed = document.getElementById("editor");
+  ed.style.display = "block";
+  const card = cards.find(c => c.id === id);
+  if(!card) return;
+  document.getElementById("fImage").value = card.data.image || "";
+  document.getElementById("fName").value = card.data.name || "";
+  fillBranchSelect(card.data.branch);
+  fillRankSelect(card.data.branch, card.data.rank);
+  document.getElementById("fSubbranch").value = card.data.subbranch || "";
+  document.getElementById("fStatus").value = card.data.status || "Unknown";
+  document.getElementById("fDesc").value = card.data.desc || "";
+  renderFileList("relatedList", card.data.relatedFiles);
+  renderFileList("otherList", card.data.otherFiles);
+  selected = id;
+}
+function fillBranchSelect(selectedBranch) {
+  const sel = document.getElementById("fBranch");
+  sel.innerHTML = "";
+  Object.keys(branchColors).forEach(b=>{
+    const opt = document.createElement("option");
+    opt.value = b;
+    opt.textContent = b;
+    if(b === selectedBranch) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  fillRankSelect(selectedBranch, null);
+}
+function fillRankSelect(branch, selectedRank){
+  const sel = document.getElementById("fRank");
+  sel.innerHTML = "";
+  (rankLists[branch] || ['None']).forEach(r=>{
+    const opt = document.createElement("option");
+    opt.value = r;
+    opt.textContent = r;
+    if(r === selectedRank) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function renderFileList(containerId, files){
+  const cont = document.getElementById(containerId);
+  cont.innerHTML = "";
+  if(!files || files.length === 0){
+    cont.textContent = "(none)";
+    return;
+  }
+  files.forEach(f=>{
+    const a = document.createElement("a");
+    a.href = f.url || f;
+    a.textContent = f.name || fileNameFromUrl(f.url || f);
+    a.target = "_blank";
+    a.rel = "noopener";
+    cont.appendChild(a);
+  });
+}
+// Event handlers for adding/removing files, saving, cancelling edits...
+document.getElementById("btnAddRelated").onclick = ()=>{
+  if(!selected) return alert("No card selected");
+  const pick = document.getElementById("fRelatedPick");
+  const url = pick.value;
+  const name = pick.options[pick.selectedIndex].text;
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  if(!card.data.relatedFiles) card.data.relatedFiles = [];
+  if(!card.data.relatedFiles.some(f=>f.url === url)) {
+    card.data.relatedFiles.push({url, name});
+    renderFileList("relatedList", card.data.relatedFiles);
+  }
+};
+document.getElementById("btnAddOther").onclick = ()=>{
+  if(!selected) return alert("No card selected");
+  const input = document.getElementById("fOtherUrl");
+  const url = input.value.trim();
+  if(!url) return;
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  if(!card.data.otherFiles) card.data.otherFiles = [];
+  card.data.otherFiles.push({url, name: fileNameFromUrl(url)});
+  renderFileList("otherList", card.data.otherFiles);
+  input.value = "";
+};
+document.getElementById("btnSave").onclick = ()=>{
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  card.data.image = document.getElementById("fImage").value.trim();
+  card.data.name = document.getElementById("fName").value.trim();
+  card.data.branch = document.getElementById("fBranch").value;
+  card.data.subbranch = document.getElementById("fSubbranch").value.trim();
+  card.data.rank = document.getElementById("fRank").value;
+  card.data.status = document.getElementById("fStatus").value;
+  card.data.desc = document.getElementById("fDesc").value.trim();
+  card.data.branchColor = branchColors[card.data.branch] || "#777";
+  const oldEl = document.getElementById(card.id);
+  if(oldEl) oldEl.remove();
+  makeCardView(card);
+  updateEdges();
+  closeEditor();
+  snapshot();
+  render();
+};
+document.getElementById("btnCancel").onclick = closeEditor;
+document.getElementById("fBranch").addEventListener("change", (e)=>{
+  fillRankSelect(e.target.value, null);
+});
+stage.addEventListener("dblclick", e=>{
+  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#ui")) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  const id = "c" + Math.random().toString(36).slice(2,9);
+  const newCard = {
+    id,
+    x: pos.x - 180,
+    y: pos.y - 90,
+    data: {
+      image: "https://i.pravatar.cc/75",
+      name: "New Profile",
+      branch: "None",
+      subbranch: "",
+      rank: "None",
+      status: "Unknown",
+      desc: "",
+      relatedFiles: [],
+      otherFiles: [],
+      branchColor: branchColors["None"],
+    },
+  };
+  cards.push(newCard);
+  selected = id;
+  makeCardView(newCard);
+  snapshot();
+  render();
+  openEditor(id);
+});
+document.getElementById("undoBtn").onclick = undo;
+document.getElementById("redoBtn").onclick = redo;
+
+const webNameInput = document.getElementById("webNameInput");
+const webListDropdown = document.getElementById("webListDropdown");
+
+let currentWebListener = null;
+
+async function subscribeToWeb(name) {
+  if (currentWebListener) {
+    db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+    currentWebListener = null;
+  }
+  if(!name) return;
+
+  const ref = db.ref(`connectionWebs/${name}`);
+
+  // Listen for realtime updates
+  currentWebListener = ref.on('value', snapshot => {
+    const data = snapshot.val();
+    if (!data) {
+      toast("No data found for this connection web");
+      cards = [];
+      edges = [];
+      render();
+      return;
+    }
+    cards.splice(0, cards.length, ...(data.cards || []));
+    edges.splice(0, edges.length, ...(data.edges || []));
+    tx = data.tx || 0;
+    ty = data.ty || 0;
+    scale = data.scale || 1;
+    applyTransform();
+    render();
+    toast(`Synced with "${name}"`);
+  }, error => {
+    alert("Realtime sync failed: " + error.message);
+  });
+}
+
+webListDropdown.addEventListener("change", (e) => {
+  const name = e.target.value;
+  localStorage.setItem("lastWeb", name);
+  webNameInput.value = name;
+  subscribeToWeb(name);
+});
+webNameInput.addEventListener("change", (e) => {
+  const name = e.target.value.trim();
+  if (name) {
+    localStorage.setItem("lastWeb", name);
+    subscribeToWeb(name);
+    if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      webListDropdown.appendChild(opt);
+      webListDropdown.value = name;
+    }
+  }
+});
+
+async function saveCurrentWeb() {
+  const name = webNameInput.value.trim();
+  if (!name) {
+    alert("Enter a Connection Web name");
+    return;
+  }
+  const data = { cards, edges, tx, ty, scale, updatedAt: Date.now() };
+  try {
+    await db.ref(`connectionWebs/${name}`).set(data);
+    toast("Connection Web saved!");
+  } catch (e) {
+    alert("Save failed: " + e.message);
+  }
+}
+document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
+
+async function deleteCurrentWeb() {
+  const name = webListDropdown.value;
+  if (!name) {
+    alert("Select a Connection Web to delete");
+    return;
+  }
+  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
+  if (confirmed !== "DELETE") {
+    alert("Deletion cancelled");
+    return;
+  }
+  try {
+    if (currentWebListener) {
+      db.ref(`connectionWebs/${name}`).off('value', currentWebListener);
+      currentWebListener = null;
+    }
+    await db.ref(`connectionWebs/${name}`).remove();
+    toast("Connection Web deleted");
+    await refreshWebList();
+  } catch (e) {
+    alert("Delete failed: " + e.message);
+  }
+}
+document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
+
+async function refreshWebList() {
+  try {
+    const snapshot = await db.ref('connectionWebs').once('value');
+    const data = snapshot.val() || {};
+    webListDropdown.innerHTML = "";
+    Object.keys(data).sort().forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      webListDropdown.appendChild(opt);
+    });
+    let last = localStorage.getItem("lastWeb");
+    if (last && data[last]) {
+      webListDropdown.value = last;
+      webNameInput.value = last;
+      subscribeToWeb(last);
+    }
+  } catch (e) {
+    console.error("Failed to load Connection Webs list:", e);
+  }
+}
+document.getElementById("deleteCardBtn").onclick = function(){
+  if(!selected) {
+    alert("Select a card first");
+    return;
+  }
+  if(!confirm("Delete selected card?")) return;
+  cards.splice(cards.findIndex(c => c.id === selected), 1);
+  edges.splice(0, edges.length, ...edges.filter(e => e.a.card !== selected && e.b.card !== selected));
+  const el = document.getElementById(selected);
+  if(el) el.remove();
+  selected = null;
+  closeEditor();
+  render();
+  snapshot();
+};
+stage.addEventListener("click", e=>{
+  if(e.target === stage){
+    if(selected){
+      const el = document.getElementById(selected);
+      if(el) el.classList.remove("selected");
+      selected = null;
+      closeEditor();
+    }
+  }
+});
+document.getElementById("searchBox").oninput = function(){
+  const query = this.value.toLowerCase();
+  cards.forEach(card=>{
+    const el = document.getElementById(card.id);
+    if(!el) return;
+    const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
+    if(!query || text.includes(query)){
+      el.style.display = "flex";
+    }else{
+      el.style.display = "none";
+    }
+  });
+};
+document.addEventListener("DOMContentLoaded", ()=>{
+  refreshWebList();
+});
+</script>
+</body>
+</html>
