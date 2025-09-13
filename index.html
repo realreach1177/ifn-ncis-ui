@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Connection Web UI - Live Sync Full</title>
+<title>Connection Web UI - Full with Link Name</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
@@ -13,11 +13,20 @@ html, body {
   height:100%; margin:0; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden;
 }
 #ui {
-  position:fixed; top:8px; left:8px; right:8px; z-index:200000;
-  display:flex; flex-wrap: wrap; gap:6px;
+  position: fixed;
+  top: 8px; left: 8px; right: 8px;
+  z-index: 200000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   max-width: calc(100vw - 16px);
-  user-select:none;
+  user-select: none;
   align-items: center;
+  justify-content: space-between;
+  padding-right: 10px;
+}
+#left-tools, #right-tools {
+  display: flex; gap:6px; align-items: center;
 }
 #ui > * {
   padding:6px 10px; border:none; border-radius:6px;
@@ -25,31 +34,87 @@ html, body {
   min-width:48px; text-align:center;
 }
 #ui button {
-  background:#2b2b2b; transition: background 0.3s;
+  background: #444f5a;
+  color: #e0e0e0;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  min-width: 64px;
 }
-#ui button:hover {
-  filter: brightness(1.2);
+
+#ui button:hover, #ui button:focus {
+  background-color: #5a6673;
+  box-shadow: 0 0 10px rgba(90, 102, 115, 0.6);
+  outline: none;
 }
-#ui button#undoBtn { background:#009688; }
-#ui button#undoBtn:hover { background:#00796b; }
-#ui button#redoBtn { background:#ff9800; }
-#ui button#redoBtn:hover { background:#ef6c00; }
-#ui button#saveWebBtn { background:#4caf50; }
-#ui button#saveWebBtn:hover { background:#388e3c; }
-#ui button#deleteWebBtn { background:#f44336; }
-#ui button#deleteWebBtn:hover { background:#d32f2f; }
-#ui button#deleteCardBtn { background:#e91e63; }
-#ui button#deleteCardBtn:hover { background:#b0003a; }
+
+#undoBtn {
+  background-color: #6a7c85;
+}
+#undoBtn:hover, #undoBtn:focus {
+  background-color: #7f929b;
+  box-shadow: 0 0 14px rgba(127, 146, 155, 0.7);
+}
+
+#redoBtn {
+  background-color: #6a7c85;
+}
+#redoBtn:hover, #redoBtn:focus {
+  background-color: #7f929b;
+  box-shadow: 0 0 14px rgba(127, 146, 155, 0.7);
+}
+
+#saveWebBtn {
+  background-color: #4b8a8a;
+}
+#saveWebBtn:hover, #saveWebBtn:focus {
+  background-color: #609b9b;
+  box-shadow: 0 0 14px rgba(96, 155, 155, 0.7);
+}
+
+#deleteWebBtn {
+  background-color: #8a4b4b;
+}
+#deleteWebBtn:hover, #deleteWebBtn:focus {
+  background-color: #9b6060;
+  box-shadow: 0 0 14px rgba(155, 96, 96, 0.7);
+}
+
+#deleteCardBtn {
+  background-color: #7a5f5f;
+}
+#deleteCardBtn:hover, #deleteCardBtn:focus {
+  background-color: #8c7070;
+  box-shadow: 0 0 14px rgba(140, 112, 112, 0.7);
+}
+
 #ui input[type="text"], #ui select {
-  background:#222; color:#eee; border-radius:6px; border:none;
-  padding:6px 10px; font-weight:600; font-size:14px;
-  min-width:150px; max-width:250px;
+  background: #2c333a;
+  border-radius: 6px;
+  border: none;
+  color: #cfd8dc;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 6px 12px;
+  min-width: 150px;
+  max-width: 250px;
+  transition: background-color 0.3s ease;
 }
+
 #ui input[type="text"]::placeholder {
-  color:#aaa;
+  color: #78909c;
 }
+
+#ui input[type="text"]:focus, #ui select:focus {
+  background-color: #3a424d;
+  outline: none;
+  box-shadow: 0 0 8px rgba(60, 90, 105, 0.6);
+}
+
 #searchBox {
-  margin-left:auto;
   min-width:200px;
 }
 #stage {
@@ -60,7 +125,8 @@ html, body {
   background-size:40px 40px;
 }
 #viewport {
-  position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible;
+  position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0;
+  overflow: visible;
 }
 #wires {
   position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;
@@ -139,14 +205,18 @@ html, body {
 </head>
 <body>
 <div id="ui">
-  <button id="undoBtn" title="Undo">Undo</button>
-  <button id="redoBtn" title="Redo">Redo</button>
-  <button id="saveWebBtn" title="Save Connection Web">Save Web</button>
-  <button id="deleteWebBtn" title="Delete Connection Web">Delete Web</button>
-  <input type="text" id="webNameInput" placeholder="Enter Connection Web Name" />
-  <select id="webListDropdown" title="Select Connection Web"></select>
-  <button id="deleteCardBtn" title="Delete Selected Card">Delete Card</button>
-  <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
+  <div id="left-tools">
+    <button id="undoBtn" title="Undo">Undo</button>
+    <button id="redoBtn" title="Redo">Redo</button>
+    <button id="deleteCardBtn" title="Delete Selected Card">Delete Card</button>
+  </div>
+  <div id="right-tools">
+    <button id="saveWebBtn" title="Save Connection Web">Save Web</button>
+    <button id="deleteWebBtn" title="Delete Connection Web">Delete Web</button>
+    <select id="webListDropdown" title="Select Connection Web"></select>
+    <input type="text" id="webNameInput" placeholder="Enter Connection Web Name" />
+    <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
+  </div>
 </div>
 <div id="stage">
   <div id="viewport">
@@ -174,37 +244,41 @@ html, body {
   <select id="fRank"></select>
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
+  
   <label>Related Files from Firebase</label>
-  <select id="fRelatedPick"></select>
+  <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <input id="fRelatedName" type="text" placeholder="Display name for hyperlink" />
   <button id="btnAddRelated" type="button">Add</button>
   <div id="relatedList" class="file-list"></div>
+  
   <label>Other Files (URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
   <button id="btnAddOther" type="button">Add</button>
   <div id="otherList" class="file-list"></div>
+  
   <div class="btns">
     <button class="save" id="btnSave" type="button">Save</button>
     <button id="btnCancel" type="button">Cancel</button>
   </div>
 </div>
 <script>
-// ===== Firebase Config - REPLACE with your own =====
+// Firebase config — Replace with your Firebase project config!
 const firebaseConfig = {
-  apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
-  authDomain: "ncis-intranet.firebaseapp.com",
-  databaseURL: "https://ncis-intranet-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "ncis-intranet",
-  storageBucket: "ncis-intranet.firebasestorage.app",
-  messagingSenderId: "1010993365309",
-  appId: "1:1010993365309:web:8c72db8c5d95c061adc554",
-  measurementId: "G-GLMXRGGSHX"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// ===== App State & Constants =====
+// App state and constants
 let cards = [];
 let edges = [];
 let selected = null;
@@ -239,7 +313,7 @@ const rankLists = {
   "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"]
 };
 
-// ===== Helper Functions =====
+// Helper functions (contrast, filename, toast, transform, coordinate conversions)
 function contrast(hex) {
   hex = (hex || '').replace('#', '');
   if (hex.length !== 6) return '#000';
@@ -265,14 +339,18 @@ function toast(msg){
     setTimeout(() => t.remove(), 300);
   }, 1500);
 }
+
 function applyTransform(){
   viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
+
 function clientToWorld(cx, cy){
   const r=stage.getBoundingClientRect();
   const sx=cx-r.left, sy=cy-r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
+
+// Rendering cards with selected highlight using branch color
 function makeCardView(card) {
   const c = document.createElement('div');
   c.className = 'card';
@@ -283,6 +361,12 @@ function makeCardView(card) {
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
+  
+  // Render links with their display names
+  function linkListHTML(files) {
+    return files.map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+  }
+
   c.innerHTML = `
     <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
@@ -292,11 +376,12 @@ function makeCardView(card) {
       <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
       <div class="desc">${d.desc || ''}</div>
       <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
-        ${[...(d.relatedFiles||[]), ...(d.otherFiles||[])].map(u => `<li><a href="${u}" target="_blank">${fileNameFromUrl(u)}</a></li>`).join('')}
+        ${linkListHTML(d.relatedFiles || [])}${linkListHTML(d.otherFiles || [])}
       </ul>
     </div>
     <div class="anchor" title="Drag to link"></div>
   `;
+
   c.addEventListener('click', e => {
     e.stopPropagation();
     if(selected) document.getElementById(selected)?.classList.remove('selected');
@@ -309,18 +394,12 @@ function makeCardView(card) {
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
     if(e.target.classList.contains('anchor')) return;
-    dragging=true;
+    dragging = true;
     c.classList.add('dragging');
     c.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - card.x;
     offset.y = wp.y - card.y;
-  });
-  c.addEventListener('pointerup', e => {
-    dragging=false;
-    c.classList.remove('dragging');
-    c.releasePointerCapture(e.pointerId);
-    snapshot();
   });
   c.addEventListener('pointermove', e => {
     if(!dragging) return;
@@ -331,10 +410,22 @@ function makeCardView(card) {
     c.style.top = card.y + 'px';
     updateEdges();
   });
+  c.addEventListener('pointerup', e => {
+    dragging = false;
+    c.classList.remove('dragging');
+    c.releasePointerCapture(e.pointerId);
+    snapshot();
+  });
+  c.addEventListener('pointercancel', e => {
+    dragging = false;
+    c.classList.remove('dragging');
+    c.releasePointerCapture(e.pointerId);
+  });
 
   cardsLayer.appendChild(c);
   return c;
 }
+
 function makeEdgeView(edge) {
   const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
   ln.setAttribute("stroke", "#fff");
@@ -344,6 +435,7 @@ function makeEdgeView(edge) {
   wiresLayer.appendChild(ln);
   return ln;
 }
+
 function anchorCenter(cardId) {
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
@@ -356,6 +448,7 @@ function anchorCenter(cardId) {
     y: (rect.top + rect.height / 2 - stageRect.top - ty) / scale,
   };
 }
+
 function updateEdge(edge) {
   const start = anchorCenter(edge.a.card);
   const end = anchorCenter(edge.b.card);
@@ -370,6 +463,7 @@ function updateEdge(edge) {
 function updateEdges() {
   edges.forEach(updateEdge);
 }
+
 function render() {
   cardsLayer.innerHTML = '';
   wiresLayer.innerHTML = '';
@@ -378,10 +472,12 @@ function render() {
   updateEdges();
   applyTransform();
 }
+
 function snapshot() {
   undoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
   redoStack = [];
 }
+
 function undo() {
   if(undoStack.length === 0){
     alert("Nothing to undo");
@@ -393,6 +489,7 @@ function undo() {
   render();
   toast("Undo");
 }
+
 function redo() {
   if(redoStack.length === 0){
     alert("Nothing to redo");
@@ -404,6 +501,7 @@ function redo() {
   render();
   toast("Redo");
 }
+
 function loadState(state) {
   cards.splice(0, cards.length, ...state.cards);
   edges.splice(0, edges.length, ...state.edges);
@@ -412,6 +510,7 @@ function loadState(state) {
   scale = state.scale;
   applyTransform();
 }
+
 function deselect() {
   if(selected){
     let el = document.getElementById(selected);
@@ -439,6 +538,7 @@ function openEditor(id){
   renderFileList("otherList", card.data.otherFiles);
   selected = id;
 }
+
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
@@ -478,31 +578,36 @@ function renderFileList(containerId, files){
     cont.appendChild(a);
   });
 }
+
 document.getElementById("btnAddRelated").onclick = ()=>{
   if(!selected) return alert("No card selected");
-  const pick = document.getElementById("fRelatedPick");
-  const url = pick.value;
-  const name = pick.options[pick.selectedIndex].text;
+  const url = document.getElementById("fRelatedUrl").value.trim();
+  const name = document.getElementById("fRelatedName").value.trim() || fileNameFromUrl(url);
+  if(!url) return alert("Please enter a URL");
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   if(!card.data.relatedFiles) card.data.relatedFiles = [];
   if(!card.data.relatedFiles.some(f=>f.url === url)) {
     card.data.relatedFiles.push({url, name});
     renderFileList("relatedList", card.data.relatedFiles);
+    document.getElementById("fRelatedUrl").value = "";
+    document.getElementById("fRelatedName").value = "";
   }
 };
 document.getElementById("btnAddOther").onclick = ()=>{
   if(!selected) return alert("No card selected");
-  const input = document.getElementById("fOtherUrl");
-  const url = input.value.trim();
-  if(!url) return;
+  const url = document.getElementById("fOtherUrl").value.trim();
+  const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
+  if(!url) return alert("Please enter a URL");
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   if(!card.data.otherFiles) card.data.otherFiles = [];
-  card.data.otherFiles.push({url, name: fileNameFromUrl(url)});
+  card.data.otherFiles.push({url, name});
   renderFileList("otherList", card.data.otherFiles);
-  input.value = "";
+  document.getElementById("fOtherUrl").value = "";
+  document.getElementById("fOtherName").value = "";
 };
+
 document.getElementById("btnSave").onclick = ()=>{
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
@@ -526,6 +631,8 @@ document.getElementById("btnCancel").onclick = closeEditor;
 document.getElementById("fBranch").addEventListener("change", (e)=>{
   fillRankSelect(e.target.value, null);
 });
+
+// Double click to add card with placeholder image
 stage.addEventListener("dblclick", e=>{
   if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#ui")) return;
   const pos = clientToWorld(e.clientX, e.clientY);
@@ -554,11 +661,26 @@ stage.addEventListener("dblclick", e=>{
   render();
   openEditor(id);
 });
+
+// Undo/redo buttons
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
-const webNameInput = document.getElementById("webNameInput");
-const webListDropdown = document.getElementById("webListDropdown");
+// Zoom on wheel event
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomFactor = 1.1;
+  const mousePos = clientToWorld(e.clientX, e.clientY);
+  if (e.deltaY < 0) scale *= zoomFactor; else scale /= zoomFactor;
+  scale = Math.min(Math.max(scale, 0.25), 4);
+  tx = e.clientX - mousePos.x * scale;
+  ty = e.clientY - mousePos.y * scale;
+  applyTransform();
+  render();
+}, { passive: false });
+
+const webNameInput = document.getElementById('webNameInput');
+const webListDropdown = document.getElementById('webListDropdown');
 
 let currentWebListener = null;
 
@@ -576,7 +698,7 @@ async function subscribeToWeb(name) {
   currentWebListener = ref.on('value', snapshot => {
     const data = snapshot.val();
     if (!data) {
-      toast("No data found for this connection web");
+      toast(`No data found for "${name}"`);
       cards = [];
       edges = [];
       render();
@@ -597,22 +719,22 @@ async function subscribeToWeb(name) {
 
 webListDropdown.addEventListener("change", (e) => {
   const name = e.target.value;
+  if (!name) return;
   localStorage.setItem("lastWeb", name);
   webNameInput.value = name;
   subscribeToWeb(name);
 });
 webNameInput.addEventListener("change", (e) => {
   const name = e.target.value.trim();
-  if (name) {
-    localStorage.setItem("lastWeb", name);
-    subscribeToWeb(name);
-    if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      webListDropdown.appendChild(opt);
-      webListDropdown.value = name;
-    }
+  if (!name) return;
+  localStorage.setItem("lastWeb", name);
+  subscribeToWeb(name);
+  if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    webListDropdown.appendChild(opt);
+    webListDropdown.value = name;
   }
 });
 
@@ -678,6 +800,7 @@ async function refreshWebList() {
     console.error("Failed to load Connection Webs list:", e);
   }
 }
+
 document.getElementById("deleteCardBtn").onclick = function(){
   if(!selected) {
     alert("Select a card first");
@@ -693,6 +816,7 @@ document.getElementById("deleteCardBtn").onclick = function(){
   render();
   snapshot();
 };
+
 stage.addEventListener("click", e=>{
   if(e.target === stage){
     if(selected){
@@ -703,6 +827,7 @@ stage.addEventListener("click", e=>{
     }
   }
 });
+
 document.getElementById("searchBox").oninput = function(){
   const query = this.value.toLowerCase();
   cards.forEach(card=>{
@@ -716,6 +841,7 @@ document.getElementById("searchBox").oninput = function(){
     }
   });
 };
+
 document.addEventListener("DOMContentLoaded", ()=>{
   refreshWebList();
 });
