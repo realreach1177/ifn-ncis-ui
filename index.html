@@ -2,142 +2,139 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Connection Web UI - Live Sync</title>
+<title>Connection Web UI - Live Sync Full</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-  html, body {
-    height:100%; margin:0; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden;
-  }
-  #ui {
-    position:fixed; top:8px; left:8px; right:8px; z-index:200000;
-    display:flex; flex-wrap: wrap; gap:6px;
-    max-width: calc(100vw - 16px);
-    user-select:none;
-    align-items: center;
-  }
-  #ui > * {
-    padding:6px 10px; border:none; border-radius:6px;
-    font-weight:600; cursor:pointer; font-size:14px; color:white;
-    min-width:48px; text-align:center;
-  }
-  #ui button {
-    background:#2b2b2b; transition: background 0.3s;
-  }
-  #ui button:hover {
-    filter: brightness(1.2);
-  }
-  #ui button#undoBtn { background:#009688; }
-  #ui button#undoBtn:hover { background:#00796b; }
-  #ui button#redoBtn { background:#ff9800; }
-  #ui button#redoBtn:hover { background:#ef6c00; }
-  #ui button#saveWebBtn { background:#4caf50; }
-  #ui button#saveWebBtn:hover { background:#388e3c; }
-  #ui button#loadWebBtn { background:#2196f3; }
-  #ui button#loadWebBtn:hover { background:#1976d2; }
-  #ui button#deleteWebBtn { background:#f44336; }
-  #ui button#deleteWebBtn:hover { background:#d32f2f; }
-  #ui button#deleteCardBtn { background:#e91e63; }
-  #ui button#deleteCardBtn:hover { background:#b0003a; }
-  #ui input[type="text"], #ui select {
-    background:#222; color:#eee; border-radius:6px; border:none;
-    padding:6px 10px; font-weight:600; font-size:14px;
-    min-width:150px; max-width:250px;
-  }
-  #ui input[type="text"]::placeholder {
-    color:#aaa;
-  }
-  /* Search bar to right */
-  #searchBox {
-    margin-left:auto;
-    min-width:200px;
-  }
-  #stage {
-    position:absolute; inset:0; background:#141414; cursor:grab;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
-    background-size:40px 40px;
-  }
-  #viewport {
-    position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible;
-  }
-  #wires {
-    position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;
-  }
-  #cards {
-    position:absolute; left:0; top:0; width:100%; height:100%;
-  }
-  .card {
-    position:absolute; width:360px; padding:15px 20px; box-sizing:border-box;
-    background:#222; color:#e0e0e0; border-radius:10px; display:flex; align-items:flex-start;
-    user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
-  }
-  .card.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
-  .card.selected {
-    outline:3px solid #ffc107;
-    box-shadow:0 0 20px 4px #ffc107;
-  }
-  .img {
-    width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:18px;
-    border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6);
-  }
-  .info { flex:1; overflow:hidden; }
-  .name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
-  .rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
-  .bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
-  .status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
-  .dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
-  .alive { background:#4caf50; }
-  .dead { background:#e53935; }
-  .unknown { background:#212121; border:1.5px solid #78909c; }
-  .anchor {
-    position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333;
-    top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20;
-  }
-  .anchor.candidate { background:#66bb6a; }
-  #editor {
-    position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
-    box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto;
-  }
-  #editor header {
-    font-weight:900; font-size:18px; padding-bottom:12px;
-  }
-  #editor label {
-    font-size:12px; margin-top:10px; display:block; color:#bbb;
-  }
-  #editor input, #editor select, #editor textarea {
-    width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px;
-    font-size:14px;
-  }
-  #editor textarea { min-height:60px; }
-  #editor .btns {
-    margin-top:14px; display:flex; gap:10px;
-  }
-  #editor .btns button {
-    flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px;
-    background:#2196f3; color:#fff; transition: background 0.3s;
-  }
-  #editor .btns button:hover { background:#1769aa; }
-  #editor .btns button.save { background:#4caf50; }
-  #editor .btns button.save:hover { background:#388e3c; }
-  .file-list {
-    max-height:100px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px;
-  }
-  .file-list a {
-    color:#74b9ff; text-decoration:none;
-  }
-  .file-list a:hover {
-    text-decoration:underline;
-  }
-  .toast {
-    position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
-    box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.9; user-select:none; z-index:999999;
-    pointer-events:none;
-  }
+html, body {
+  height:100%; margin:0; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden;
+}
+#ui {
+  position:fixed; top:8px; left:8px; right:8px; z-index:200000;
+  display:flex; flex-wrap: wrap; gap:6px;
+  max-width: calc(100vw - 16px);
+  user-select:none;
+  align-items: center;
+}
+#ui > * {
+  padding:6px 10px; border:none; border-radius:6px;
+  font-weight:600; cursor:pointer; font-size:14px; color:white;
+  min-width:48px; text-align:center;
+}
+#ui button {
+  background:#2b2b2b; transition: background 0.3s;
+}
+#ui button:hover {
+  filter: brightness(1.2);
+}
+#ui button#undoBtn { background:#009688; }
+#ui button#undoBtn:hover { background:#00796b; }
+#ui button#redoBtn { background:#ff9800; }
+#ui button#redoBtn:hover { background:#ef6c00; }
+#ui button#saveWebBtn { background:#4caf50; }
+#ui button#saveWebBtn:hover { background:#388e3c; }
+#ui button#deleteWebBtn { background:#f44336; }
+#ui button#deleteWebBtn:hover { background:#d32f2f; }
+#ui button#deleteCardBtn { background:#e91e63; }
+#ui button#deleteCardBtn:hover { background:#b0003a; }
+#ui input[type="text"], #ui select {
+  background:#222; color:#eee; border-radius:6px; border:none;
+  padding:6px 10px; font-weight:600; font-size:14px;
+  min-width:150px; max-width:250px;
+}
+#ui input[type="text"]::placeholder {
+  color:#aaa;
+}
+#searchBox {
+  margin-left:auto;
+  min-width:200px;
+}
+#stage {
+  position:absolute; inset:0; background:#141414; cursor:grab;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size:40px 40px;
+}
+#viewport {
+  position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible;
+}
+#wires {
+  position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;
+}
+#cards {
+  position:absolute; left:0; top:0; width:100%; height:100%;
+}
+.card {
+  position:absolute; width:360px; padding:15px 20px; box-sizing:border-box;
+  background:#222; color:#e0e0e0; border-radius:10px; display:flex; align-items:flex-start;
+  user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
+}
+.card.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
+.card.selected {
+  outline:3px solid var(--selectedHighlightColor, #ffc107);
+  box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107);
+}
+.img {
+  width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:18px;
+  border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6);
+}
+.info { flex:1; overflow:hidden; }
+.name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
+.rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
+.bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
+.status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+.dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
+.alive { background:#4caf50; }
+.dead { background:#e53935; }
+.unknown { background:#212121; border:1.5px solid #78909c; }
+.anchor {
+  position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333;
+  top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20;
+}
+.anchor.candidate { background:#66bb6a; }
+#editor {
+  position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
+  box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto;
+}
+#editor header {
+  font-weight:900; font-size:18px; padding-bottom:12px;
+}
+#editor label {
+  font-size:12px; margin-top:10px; display:block; color:#bbb;
+}
+#editor input, #editor select, #editor textarea {
+  width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px;
+  font-size:14px;
+}
+#editor textarea { min-height:60px; }
+#editor .btns {
+  margin-top:14px; display:flex; gap:10px;
+}
+#editor .btns button {
+  flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px;
+  background:#2196f3; color:#fff; transition: background 0.3s;
+}
+#editor .btns button:hover { background:#1769aa; }
+#editor .btns button.save { background:#4caf50; }
+#editor .btns button.save:hover { background:#388e3c; }
+.file-list {
+  max-height:100px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px;
+}
+.file-list a {
+  color:#74b9ff; text-decoration:none;
+}
+.file-list a:hover {
+  text-decoration:underline;
+}
+.toast {
+  position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
+  box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.9; user-select:none; z-index:999999;
+  pointer-events:none;
+}
 </style>
 </head>
 <body>
@@ -191,7 +188,7 @@
   </div>
 </div>
 <script>
-// ===== Firebase config - REPLACE with your real Firebase config =====
+// ===== Firebase Config - REPLACE with your own =====
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -207,11 +204,13 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// ===== App State =====
+// ===== App State & Constants =====
 let cards = [];
 let edges = [];
 let selected = null;
 let scale = 1, tx = 0, ty = 0;
+let undoStack = [];
+let redoStack = [];
 
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
@@ -281,6 +280,7 @@ function makeCardView(card) {
   c.style.left = card.x + 'px';
   c.style.top = card.y + 'px';
   c.style.setProperty('--branchGlow', card.data.branchColor || '#4caf50');
+  c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
   c.innerHTML = `
@@ -478,7 +478,6 @@ function renderFileList(containerId, files){
     cont.appendChild(a);
   });
 }
-// Event handlers for adding/removing files, saving, cancelling edits...
 document.getElementById("btnAddRelated").onclick = ()=>{
   if(!selected) return alert("No card selected");
   const pick = document.getElementById("fRelatedPick");
@@ -536,7 +535,7 @@ stage.addEventListener("dblclick", e=>{
     x: pos.x - 180,
     y: pos.y - 90,
     data: {
-      image: "https://i.pravatar.cc/75",
+      image: "https://i.ibb.co/zhKnjbh1/unknownperson.png",
       name: "New Profile",
       branch: "None",
       subbranch: "",
@@ -565,14 +564,15 @@ let currentWebListener = null;
 
 async function subscribeToWeb(name) {
   if (currentWebListener) {
-    db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+    if(webListDropdown.value) {
+      db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+    }
     currentWebListener = null;
   }
   if(!name) return;
 
   const ref = db.ref(`connectionWebs/${name}`);
 
-  // Listen for realtime updates
   currentWebListener = ref.on('value', snapshot => {
     const data = snapshot.val();
     if (!data) {
