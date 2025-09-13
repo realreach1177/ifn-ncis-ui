@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Connection Web UI - Full with Link Name & Clean UI</title>
+<title>Connection Web UI - Full with Links, TextBoxes & Clean UI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
@@ -84,6 +84,13 @@ html, body {
   background-color: #8c7070;
   box-shadow: 0 0 14px rgba(140, 112, 112, 0.7);
 }
+#addTextBoxBtn {
+  background-color: #5a758e;
+}
+#addTextBoxBtn:hover, #addTextBoxBtn:focus {
+  background-color: #7090ad;
+  box-shadow: 0 0 14px rgba(112, 144, 173, 0.7);
+}
 #ui input[type="text"], #ui select {
   background: #2c333a;
   border-radius: 6px;
@@ -124,13 +131,23 @@ html, body {
 #cards {
   position:absolute; left:0; top:0; width:100%; height:100%;
 }
-.card {
-  position:absolute; width:360px; padding:15px 20px; box-sizing:border-box;
-  background:#222; color:#e0e0e0; border-radius:10px; display:flex; align-items:flex-start;
+.card, .textbox {
+  position:absolute; padding:15px 20px; box-sizing:border-box;
+  background:#222; color:#e0e0e0; border-radius:10px;
   user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
+  overflow-wrap: break-word;
 }
-.card.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
-.card.selected {
+.card {
+  width:360px; display:flex; align-items:flex-start;
+}
+.textbox {
+  width:300px; min-height:50px; resize: both; overflow:auto;
+  font-size: 14px;
+  font-family: system-ui, Segoe UI, Tahoma, Arial;
+  cursor: grab;
+}
+.card.dragging, .textbox.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
+.card.selected, .textbox.selected {
   outline:3px solid var(--selectedHighlightColor, #ffc107);
   box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107);
 }
@@ -199,6 +216,7 @@ html, body {
     <button id="undoBtn" title="Undo">Undo</button>
     <button id="redoBtn" title="Redo">Redo</button>
     <button id="deleteCardBtn" title="Delete Selected Card">Delete Card</button>
+    <button id="addTextBoxBtn" title="Add Text Box">Add Text Box</button>
   </div>
   <div id="right-tools">
     <button id="saveWebBtn" title="Save Connection Web">Save Web</button>
@@ -269,10 +287,12 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// App state and constantsa
+// App state and constants
 let cards = [];
 let edges = [];
+let textBoxes = [];
 let selected = null;
+let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
@@ -292,7 +312,6 @@ const branchColors = {
   "Taliban Special Forces": "#b38800",
   "Al-Qaeda": "#d7a857"
 };
-
 const rankLists = {
   "None":["None"],
   "United States Army": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"],
@@ -304,6 +323,7 @@ const rankLists = {
   "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"]
 };
 
+// Helper functions
 function contrast(hex) {
   hex = (hex || '').replace('#', '');
   if (hex.length !== 6) return '#000';
@@ -338,6 +358,7 @@ function clientToWorld(cx, cy){
   const sx=cx-r.left, sy=cy-r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
+// --- CARD RENDERER ---
 function makeCardView(card) {
   const c = document.createElement('div');
   c.className = 'card';
@@ -348,11 +369,9 @@ function makeCardView(card) {
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
-  
   function linkListHTML(files) {
     return files.map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
   }
-
   c.innerHTML = `
     <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
@@ -367,15 +386,17 @@ function makeCardView(card) {
     </div>
     <div class="anchor" title="Drag to link"></div>
   `;
-
   c.addEventListener('click', e => {
     e.stopPropagation();
-    if(selected) document.getElementById(selected)?.classList.remove('selected');
+    if(selected) {
+      const prev = document.getElementById(selected);
+      if(prev) prev.classList.remove('selected');
+    }
     selected = card.id;
+    selectedType = 'card';
     c.classList.add('selected');
-    openEditor(card.id);
+    openEditor(card.id, 'card');
   });
-
   let dragging = false;
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
@@ -410,6 +431,71 @@ function makeCardView(card) {
   cardsLayer.appendChild(c);
   return c;
 }
+// --- TEXTBOX RENDERER ---
+function makeTextBoxView(box) {
+  const t = document.createElement('div');
+  t.className = 'textbox';
+  t.id = box.id;
+  t.style.left = box.x + 'px';
+  t.style.top = box.y + 'px';
+  t.textContent = box.content || "";
+  t.contentEditable = true;
+  t.spellcheck = false;
+  t.style.minHeight = '50px';
+  t.style.width = box.width ? box.width + 'px' : '300px';
+
+  t.addEventListener('click', e => {
+    e.stopPropagation();
+    if(selected) {
+      const prev = document.getElementById(selected);
+      if(prev) prev.classList.remove('selected');
+    }
+    selected = box.id;
+    selectedType = 'textbox';
+    t.classList.add('selected');
+    openEditor(box.id, 'textbox');
+  });
+
+  // Dragging
+  let dragging = false;
+  let offset = {x:0,y:0};
+  t.addEventListener('pointerdown', e => {
+    dragging = true;
+    t.classList.add('dragging');
+    t.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - box.x;
+    offset.y = wp.y - box.y;
+  });
+  t.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    box.x = wp.x - offset.x;
+    box.y = wp.y - offset.y;
+    t.style.left = box.x + 'px';
+    t.style.top = box.y + 'px';
+  });
+  t.addEventListener('pointerup', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    t.releasePointerCapture(e.pointerId);
+    snapshot();
+  });
+  t.addEventListener('pointercancel', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    t.releasePointerCapture(e.pointerId);
+  });
+
+  // Content save on blur
+  t.addEventListener('input', e => {
+    box.content = t.textContent;
+  });
+
+  cardsLayer.appendChild(t);
+  return t;
+}
+
 function makeEdgeView(edge) {
   const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
   ln.setAttribute("stroke", "#fff");
@@ -419,6 +505,7 @@ function makeEdgeView(edge) {
   wiresLayer.appendChild(ln);
   return ln;
 }
+
 function anchorCenter(cardId) {
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
@@ -431,6 +518,7 @@ function anchorCenter(cardId) {
     y: (rect.top + rect.height / 2 - stageRect.top - ty) / scale,
   };
 }
+
 function updateEdge(edge) {
   const start = anchorCenter(edge.a.card);
   const end = anchorCenter(edge.b.card);
@@ -442,6 +530,7 @@ function updateEdge(edge) {
   line.setAttribute("x2", end.x);
   line.setAttribute("y2", end.y);
 }
+
 function updateEdges() {
   edges.forEach(updateEdge);
 }
@@ -450,13 +539,14 @@ function render() {
   cardsLayer.innerHTML = '';
   wiresLayer.innerHTML = '';
   cards.forEach(makeCardView);
+  textBoxes.forEach(makeTextBoxView);
   edges.forEach(makeEdgeView);
   updateEdges();
   applyTransform();
 }
 
 function snapshot() {
-  undoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
+  undoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
   redoStack = [];
 }
 
@@ -465,7 +555,7 @@ function undo() {
     alert("Nothing to undo");
     return;
   }
-  redoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
+  redoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
   const state = undoStack.pop();
   loadState(state);
   render();
@@ -477,7 +567,7 @@ function redo() {
     alert("Nothing to redo");
     return;
   }
-  undoStack.push(JSON.parse(JSON.stringify({cards, edges, tx, ty, scale})));
+  undoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
   const state = redoStack.pop();
   loadState(state);
   render();
@@ -487,6 +577,7 @@ function redo() {
 function loadState(state) {
   cards.splice(0, cards.length, ...state.cards);
   edges.splice(0, edges.length, ...state.edges);
+  textBoxes.splice(0, textBoxes.length, ...state.textBoxes);
   tx = state.tx;
   ty = state.ty;
   scale = state.scale;
@@ -498,27 +589,54 @@ function deselect() {
     let el = document.getElementById(selected);
     if(el) el.classList.remove("selected");
     selected = null;
+    selectedType = null;
   }
   closeEditor();
 }
 function closeEditor() {
   document.getElementById("editor").style.display = "none";
 }
-function openEditor(id){
+
+function openEditor(id, type){
   let ed = document.getElementById("editor");
   ed.style.display = "block";
-  const card = cards.find(c => c.id === id);
-  if(!card) return;
-  document.getElementById("fImage").value = card.data.image || "";
-  document.getElementById("fName").value = card.data.name || "";
-  fillBranchSelect(card.data.branch);
-  fillRankSelect(card.data.branch, card.data.rank);
-  document.getElementById("fSubbranch").value = card.data.subbranch || "";
-  document.getElementById("fStatus").value = card.data.status || "Unknown";
-  document.getElementById("fDesc").value = card.data.desc || "";
-  renderFileList("relatedList", card.data.relatedFiles);
-  renderFileList("otherList", card.data.otherFiles);
+
+  // Clear all inputs first
+  document.getElementById("fImage").value = "";
+  document.getElementById("fName").value = "";
+  fillBranchSelect("None");
+  fillRankSelect("None", "None");
+  document.getElementById("fSubbranch").value = "";
+  document.getElementById("fStatus").value = "Unknown";
+  document.getElementById("fDesc").value = "";
+  document.getElementById("relatedList").innerHTML = "(none)";
+  document.getElementById("otherList").innerHTML = "(none)";
+  document.getElementById("fRelatedUrl").value = "";
+  document.getElementById("fRelatedName").value = "";
+  document.getElementById("fOtherUrl").value = "";
+  document.getElementById("fOtherName").value = "";
+
   selected = id;
+  selectedType = type;
+
+  if(type === "card"){
+    const card = cards.find(c => c.id === id);
+    if(!card) return;
+    document.getElementById("fImage").value = card.data.image || "";
+    document.getElementById("fName").value = card.data.name || "";
+    fillBranchSelect(card.data.branch);
+    fillRankSelect(card.data.branch, card.data.rank);
+    document.getElementById("fSubbranch").value = card.data.subbranch || "";
+    document.getElementById("fStatus").value = card.data.status || "Unknown";
+    document.getElementById("fDesc").value = card.data.desc || "";
+    renderFileList("relatedList", card.data.relatedFiles);
+    renderFileList("otherList", card.data.otherFiles);
+  }
+  else if(type === "textbox"){
+    const box = textBoxes.find(t => t.id === id);
+    if(!box) return;
+    document.getElementById("fDesc").value = box.content || "";
+  }
 }
 
 function fillBranchSelect(selectedBranch) {
@@ -531,7 +649,6 @@ function fillBranchSelect(selectedBranch) {
     if(b === selectedBranch) opt.selected = true;
     sel.appendChild(opt);
   });
-  fillRankSelect(selectedBranch, null);
 }
 function fillRankSelect(branch, selectedRank){
   const sel = document.getElementById("fRank");
@@ -561,8 +678,9 @@ function renderFileList(containerId, files){
   });
 }
 
+// Add related file URL and name to card
 document.getElementById("btnAddRelated").onclick = ()=>{
-  if(!selected) return alert("No card selected");
+  if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fRelatedUrl").value.trim();
   const name = document.getElementById("fRelatedName").value.trim() || fileNameFromUrl(url);
   if(!url) return alert("Please enter a URL");
@@ -576,8 +694,9 @@ document.getElementById("btnAddRelated").onclick = ()=>{
     document.getElementById("fRelatedName").value = "";
   }
 };
+// Add other file URL and name to card
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected) return alert("No card selected");
+  if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
   if(!url) return alert("Please enter a URL");
@@ -590,33 +709,47 @@ document.getElementById("btnAddOther").onclick = ()=>{
   document.getElementById("fOtherName").value = "";
 };
 
+// Save button: saves card or textbox data
 document.getElementById("btnSave").onclick = ()=>{
-  const card = cards.find(c=>c.id === selected);
-  if(!card) return;
-  card.data.image = document.getElementById("fImage").value.trim();
-  card.data.name = document.getElementById("fName").value.trim();
-  card.data.branch = document.getElementById("fBranch").value;
-  card.data.subbranch = document.getElementById("fSubbranch").value.trim();
-  card.data.rank = document.getElementById("fRank").value;
-  card.data.status = document.getElementById("fStatus").value;
-  card.data.desc = document.getElementById("fDesc").value.trim();
-  card.data.branchColor = branchColors[card.data.branch] || "#777";
-  const oldEl = document.getElementById(card.id);
-  if(oldEl) oldEl.remove();
-  makeCardView(card);
-  updateEdges();
+  if(!selected) return;
+  if(selectedType === 'card'){
+    const card = cards.find(c=>c.id === selected);
+    if(!card) return;
+    card.data.image = document.getElementById("fImage").value.trim();
+    card.data.name = document.getElementById("fName").value.trim();
+    card.data.branch = document.getElementById("fBranch").value;
+    card.data.subbranch = document.getElementById("fSubbranch").value.trim();
+    card.data.rank = document.getElementById("fRank").value;
+    card.data.status = document.getElementById("fStatus").value;
+    card.data.desc = document.getElementById("fDesc").value.trim();
+    card.data.branchColor = branchColors[card.data.branch] || "#777";
+    const oldEl = document.getElementById(card.id);
+    if(oldEl) oldEl.remove();
+    makeCardView(card);
+    updateEdges();
+  }
+  else if(selectedType === 'textbox'){
+    const box = textBoxes.find(t => t.id === selected);
+    if(!box) return;
+    box.content = document.getElementById("fDesc").value.trim();
+    const oldEl = document.getElementById(box.id);
+    if(oldEl){
+      oldEl.textContent = box.content;
+    }
+  }
   closeEditor();
   snapshot();
   render();
 };
 document.getElementById("btnCancel").onclick = closeEditor;
+
 document.getElementById("fBranch").addEventListener("change", (e)=>{
   fillRankSelect(e.target.value, null);
 });
 
-// Double click to add card with placeholder image
+// Double-click stage to add card
 stage.addEventListener("dblclick", e=>{
-  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#ui")) return;
+  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#ui") || e.target.classList.contains("textbox")) return;
   const pos = clientToWorld(e.clientX, e.clientY);
   const id = "c" + Math.random().toString(36).slice(2,9);
   const newCard = {
@@ -638,28 +771,154 @@ stage.addEventListener("dblclick", e=>{
   };
   cards.push(newCard);
   selected = id;
+  selectedType = 'card';
   makeCardView(newCard);
   snapshot();
   render();
-  openEditor(id);
+  openEditor(id, 'card');
 });
 
-// Undo/redo buttons
+// Add Text Box button adds a new textbox
+document.getElementById("addTextBoxBtn").onclick = () => {
+  const pos = { x: 50, y: 50 };
+  const id = "t" + Math.random().toString(36).slice(2,9);
+  const newBox = { id, x: pos.x, y: pos.y, content: "", width: 300 };
+  textBoxes.push(newBox);
+  selected = id;
+  selectedType = 'textbox';
+  makeTextBoxView(newBox);
+  snapshot();
+  render();
+  openEditor(id, 'textbox');
+};
+
+// Undo/Redo buttons
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
-// Zoom on wheel event
+// Zoom functionality on mouse wheel
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
   const mousePos = clientToWorld(e.clientX, e.clientY);
-  if (e.deltaY < 0) scale *= zoomFactor; else scale /= zoomFactor;
+  if (e.deltaY < 0) scale *= zoomFactor;
+  else scale /= zoomFactor;
   scale = Math.min(Math.max(scale, 0.25), 4);
   tx = e.clientX - mousePos.x * scale;
   ty = e.clientY - mousePos.y * scale;
   applyTransform();
   render();
 }, { passive: false });
+
+// Drag to pan viewport
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let panOrigin = { tx: 0, ty: 0 };
+stage.addEventListener('pointerdown', e => {
+  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#ui') || e.target.classList.contains('textbox')) return;
+  isPanning = true;
+  panStart.x = e.clientX;
+  panStart.y = e.clientY;
+  panOrigin.tx = tx;
+  panOrigin.ty = ty;
+  stage.style.cursor = 'grabbing';
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (!isPanning) return;
+  const dx = e.clientX - panStart.x;
+  const dy = e.clientY - panStart.y;
+  tx = panOrigin.tx + dx;
+  ty = panOrigin.ty + dy;
+  applyTransform();
+  render();
+});
+stage.addEventListener('pointerup', e => {
+  if (!isPanning) return;
+  isPanning = false;
+  stage.style.cursor = 'grab';
+  stage.releasePointerCapture(e.pointerId);
+  snapshot();
+});
+stage.addEventListener('pointercancel', e => {
+  if (!isPanning) return;
+  isPanning = false;
+  stage.style.cursor = 'grab';
+  stage.releasePointerCapture(e.pointerId);
+  snapshot();
+});
+
+// Anchor dragging and creating links
+let anchorDrag = {
+  active: false,
+  startCardId: null,
+  tmpLine: null,
+};
+stage.addEventListener('pointerdown', e => {
+  if (e.target.classList.contains('anchor')) {
+    const cardEl = e.target.closest('.card');
+    if (!cardEl) return;
+    anchorDrag.active = true;
+    anchorDrag.startCardId = cardEl.id;
+    const svgNS = "http://www.w3.org/2000/svg";
+    anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffd54f');
+    anchorDrag.tmpLine.setAttribute('stroke-width', '3');
+    wiresLayer.appendChild(anchorDrag.tmpLine);
+    const startPos = anchorCenter(anchorDrag.startCardId);
+    if (startPos) {
+      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
+      anchorDrag.tmpLine.setAttribute('x2', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y2', startPos.y);
+    }
+    e.target.setPointerCapture(e.pointerId);
+  }
+});
+stage.addEventListener('pointermove', e => {
+  if (!anchorDrag.active) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  if (anchorDrag.tmpLine) {
+    anchorDrag.tmpLine.setAttribute('x2', pos.x);
+    anchorDrag.tmpLine.setAttribute('y2', pos.y);
+  }
+});
+stage.addEventListener('pointerup', e => {
+  if (!anchorDrag.active) return;
+  anchorDrag.active = false;
+  if (anchorDrag.tmpLine) {
+    anchorDrag.tmpLine.remove();
+    anchorDrag.tmpLine = null;
+  }
+  let targetCard = null;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if(el) {
+    const cardEl = el.closest('.card');
+    if(cardEl) targetCard = cardEl.id;
+  }
+  if (!targetCard || targetCard === anchorDrag.startCardId) {
+    e.target.releasePointerCapture(e.pointerId);
+    return;
+  }
+  if (!edges.some(edge => 
+    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) || 
+    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
+  )) {
+    const newEdge = {
+      id: "e" + Math.random().toString(36).slice(2,9),
+      a: { card: anchorDrag.startCardId },
+      b: { card: targetCard }
+    };
+    edges.push(newEdge);
+    makeEdgeView(newEdge);
+    updateEdges();
+    snapshot();
+    render();
+  }
+  e.target.releasePointerCapture(e.pointerId);
+});
+
+// Following are firebase live sync and UI event handlers
 
 const webNameInput = document.getElementById('webNameInput');
 const webListDropdown = document.getElementById('webListDropdown');
@@ -674,20 +933,20 @@ async function subscribeToWeb(name) {
     currentWebListener = null;
   }
   if(!name) return;
-
   const ref = db.ref(`connectionWebs/${name}`);
-
   currentWebListener = ref.on('value', snapshot => {
     const data = snapshot.val();
     if (!data) {
       toast(`No data found for "${name}"`);
       cards = [];
       edges = [];
+      textBoxes = [];
       render();
       return;
     }
     cards.splice(0, cards.length, ...(data.cards || []));
     edges.splice(0, edges.length, ...(data.edges || []));
+    textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
     tx = data.tx || 0;
     ty = data.ty || 0;
     scale = data.scale || 1;
@@ -726,7 +985,7 @@ async function saveCurrentWeb() {
     alert("Enter a Connection Web name");
     return;
   }
-  const data = { cards, edges, tx, ty, scale, updatedAt: Date.now() };
+  const data = { cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() };
   try {
     await db.ref(`connectionWebs/${name}`).set(data);
     toast("Connection Web saved!");
@@ -785,15 +1044,21 @@ async function refreshWebList() {
 
 document.getElementById("deleteCardBtn").onclick = function(){
   if(!selected) {
-    alert("Select a card first");
+    alert("Select a card or textbox first");
     return;
   }
-  if(!confirm("Delete selected card?")) return;
-  cards.splice(cards.findIndex(c => c.id === selected), 1);
-  edges.splice(0, edges.length, ...edges.filter(e => e.a.card !== selected && e.b.card !== selected));
+  if(!confirm("Delete selected item?")) return;
+  if(selectedType === "card"){
+    cards.splice(cards.findIndex(c => c.id === selected), 1);
+    edges.splice(0, edges.length, ...edges.filter(e => e.a.card !== selected && e.b.card !== selected));
+  }
+  else if(selectedType === "textbox"){
+    textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
+  }
   const el = document.getElementById(selected);
   if(el) el.remove();
   selected = null;
+  selectedType = null;
   closeEditor();
   render();
   snapshot();
@@ -805,22 +1070,24 @@ stage.addEventListener("click", e=>{
       const el = document.getElementById(selected);
       if(el) el.classList.remove("selected");
       selected = null;
+      selectedType = null;
       closeEditor();
     }
   }
 });
-
 document.getElementById("searchBox").oninput = function(){
   const query = this.value.toLowerCase();
   cards.forEach(card=>{
     const el = document.getElementById(card.id);
     if(!el) return;
     const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
-    if(!query || text.includes(query)){
-      el.style.display = "flex";
-    }else{
-      el.style.display = "none";
-    }
+    el.style.display = !query || text.includes(query) ? "flex" : "none";
+  });
+  textBoxes.forEach(box=>{
+    const el = document.getElementById(box.id);
+    if(!el) return;
+    const text = box.content.toLowerCase();
+    el.style.display = !query || text.includes(query) ? "block" : "none";
   });
 };
 
