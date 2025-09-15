@@ -441,31 +441,26 @@ function anchorCenter(cardId) {
 }
 
 function updateEdges() {
-  // Clear existing
-  while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
+  wiresLayer.innerHTML = "";
+  const svgNS = "http://www.w3.org/2000/svg";
+
   edges.forEach(edge => {
-    // Support both legacy and current edge shapes
-    const aId = edge.a ? edge.a.card : (edge.from || null);
-    const bId = edge.b ? edge.b.card : (edge.to || null);
-    const aCard = cards.find(c => c.id === aId);
-    const bCard = cards.find(c => c.id === bId);
-    if (!aCard || !bCard) return;
-    const posA = anchorCenter(aCard.id);
-    const posB = anchorCenter(bCard.id);
-    if (!posA || !posB) return;
-    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    // set coordinates in WORLD space — viewport is transformed with CSS scale/translate
-    line.setAttribute("x1", posA.x);
-    line.setAttribute("y1", posA.y);
-    line.setAttribute("x2", posB.x);
-    line.setAttribute("y2", posB.y);
-    line.setAttribute("stroke", "#ffffff");       // solid white as requested
-    line.setAttribute("stroke-width", "4");
-    line.setAttribute("stroke-linecap", "round");
-    line.setAttribute("opacity", "0.95");
+    const aPos = anchorCenter(edge.a.card);
+    const bPos = anchorCenter(edge.b.card);
+    if (!aPos || !bPos) return;
+
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', aPos.x);
+    line.setAttribute('y1', aPos.y);
+    line.setAttribute('x2', bPos.x);
+    line.setAttribute('y2', bPos.y);
+    line.setAttribute('stroke', '#ffffff');
+    line.setAttribute('stroke-width', 2);
+    line.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(line);
   });
 }
+
 
 /* ---------- Rendering cards & textboxes ---------- */
 function makeCardView(card) {
