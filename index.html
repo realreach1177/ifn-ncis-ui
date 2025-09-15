@@ -4,201 +4,186 @@
 <meta charset="UTF-8" />
 <title>OrgChart Connection Web — Fixed</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<!-- Firebase SDKs (compat) -->
+<!-- Firebase SDKs (compat used in your original) -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-html, body { margin:0; padding:0; height:100%; background:#000; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
+  /* Basic page */
+  html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
 
-/* Toolbar (merged) */
-#toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
-.toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
-#toolbar button, #toolbar input, #toolbar select { border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer; font-size:14px; }
-#toolbar button { background:#333; color:#eee; transition: background-color 0.25s ease, box-shadow 0.25s ease; }
-#toolbar button:hover { background:#3f3f3f; box-shadow:0 0 10px rgba(255,255,255,0.08); }
-#saveWebBtn { background:#2e7d32; color:#fff; }
-#loadWebBtn { background:#1565c0; color:#fff; }
-#deleteWebBtn { background:#c62828; color:#fff; }
-#webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
+  /* Toolbar */
+  #toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
+  .toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
+  #toolbar button, #toolbar input, #toolbar select { border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer; font-size:14px; }
+  #toolbar button { background:#333; color:#eee; transition: background-color 0.25s ease, box-shadow 0.25s ease; }
+  #toolbar button:hover { background:#3f3f3f; box-shadow:0 0 10px rgba(255,255,255,0.08); }
+  #saveWebBtn { background:#2e7d32; color:#fff; }
+  #loadWebBtn { background:#1565c0; color:#fff; }
+  #deleteWebBtn { background:#c62828; color:#fff; }
+  #webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
 
-/* Stage and layers: stage background is black outside of 'world' */
-#stage { position:absolute; inset:0; overflow:hidden; background:#000; cursor:grab; }
-#viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
+  /* Stage / viewport */
+  #stage { position:absolute; inset:0; overflow:hidden; background:#141414; cursor:grab;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size:40px 40px;
+  }
+  #viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
+  /* We'll keep wires & cards inside the viewport but give them fixed world-size */
+  #wires { position:absolute; left:0; top:0; width:3000px; height:1000px; overflow:visible; pointer-events:none; z-index:1; }
+  #cards { position:absolute; left:0; top:0; width:3000px; height:1000px; }
 
-/* 'World' bounds: fixed finite area (grid inside). Outside world is black. */
-#world { position:absolute; left:0; top:0; width:5000px; height:5000px; background:#141414;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size:40px 40px;
-  box-sizing: border-box;
-  border: 0px solid transparent; /* option to show border if needed */
-}
+  /* Cards & textboxes */
+  .card, .textbox-wrapper {
+    position:absolute; padding:0; box-sizing:border-box;
+    user-select:none; cursor:grab; z-index:10; transition:box-shadow 0.15s;
+  }
+  .card {
+    position:relative; width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:visible;
+  }
+  .textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
+  .textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, "Segoe UI", Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; }
 
-/* SVG wires and cards live inside #world */
-#wires { position:absolute; left:0; top:0; width:5000px; height:5000px; overflow:visible; pointer-events:none; z-index:1; }
-#cards { position:absolute; left:0; top:0; width:5000px; height:5000px; }
+  .card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50); }
+  .card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
 
-/* Cards and textboxes */
-.card, .textbox-wrapper {
-  position:absolute; padding:0; box-sizing:border-box;
-  user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
-}
-.card {
-  position: relative;  /* anchor positioned relative to card */
-  width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:visible;
-}
-.textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
-.textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, Segoe UI, Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; }
-.card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
-.card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
-.img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
-.info { flex:1; overflow:hidden; }
-.name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
-.rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
-.bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
-.status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
-.dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
-.alive { background:#4caf50; } .dead { background:#e53935; } .unknown { background:#212121; border:1.5px solid #78909c; }
+  .img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
+  .info { flex:1; overflow:hidden; }
+  .name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
+  .rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
+  .bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
+  .status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
+  .alive { background:#4caf50; } .dead { background:#e53935; } .unknown { background:#212121; border:1.5px solid #78909c; }
 
-/* Anchor dot */
-.anchor {
-  position:absolute;
-  width:16px;
-  height:16px;
-  border-radius:50%;
-  background:#ffffff;
-  border:2px solid #000000;
-  top: -6px;             /* slightly above top edge; adjust if needed */
-  left: 50%;
-  transform: translateX(-50%);
-  z-index:9999;
-  cursor:crosshair;
-}
+  /* Anchor style: top but slightly below the card top (so it's visible) */
+  .anchor {
+    position:absolute; width:16px; height:16px; border-radius:50%;
+    background:#ffffff; border:2px solid #000000;
+    top:-6px; left:50%; transform:translateX(-50%); z-index:9999; cursor:crosshair;
+  }
 
-/* Editor side panel */
-#editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
-  box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
-#editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
-#editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
-#editor input, #editor select, #editor textarea { width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px; }
-#editor textarea { min-height:60px; }
-#editor .btns { margin-top:14px; display:flex; gap:10px; }
-#editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
-#editor .btns button:hover { background:#1769aa; }
-#editor .btns button.save { background:#4caf50; }
-#editor .btns button.save:hover { background:#388e3c; }
+  /* Editor */
+  #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee; box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
+  #editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
+  #editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
+  #editor input, #editor select, #editor textarea { width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px; }
+  #editor textarea { min-height:60px; }
+  #editor .btns { margin-top:14px; display:flex; gap:10px; }
+  #editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
+  #editor .btns button:hover { background:#1769aa; }
+  #editor .btns button.save { background:#4caf50; }
+  #editor .btns button.save:hover { background:#388e3c; }
+  .file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
+  .file-list a { color:#74b9ff; text-decoration:none; }
+  .file-list a:hover { text-decoration:underline; }
 
-.file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
-.file-list a { color:#74b9ff; text-decoration:none; }
-.file-list a:hover { text-decoration:underline; }
+  /* Toast */
+  .toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px; box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
 
-/* Toasts */
-.toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
-  box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
-
-/* flash highlight for search focus */
-@keyframes flash { 0%{ box-shadow:0 0 0 0 rgba(255,215,0,0.9);} 50%{ box-shadow:0 0 25px 8px rgba(255,215,0,0.9);} 100%{ box-shadow:0 0 0 0 rgba(255,215,0,0); } }
-.flash-highlight { animation: flash 1s ease-out 2; }
-
+  /* Flash highlight for focus */
+  @keyframes flash { 0%{ box-shadow:0 0 0 0 rgba(255,215,0,0.9);} 50%{ box-shadow:0 0 25px 8px rgba(255,215,0,0.9);} 100%{ box-shadow:0 0 0 0 rgba(255,215,0,0); } }
+  .flash-highlight { animation: flash 1s ease-out 2; }
 </style>
 </head>
 <body>
-<!-- Toolbar -->
-<div id="toolbar">
-  <div class="toolbar-left">
-    <button id="addProfileBtn" title="Add Profile Card">Add Profile</button>
-    <button id="addTextBtn" title="Add Text Box">Add Text</button>
-    <button id="deleteSelectedBtn" title="Delete Selected">Delete</button>
-    <button id="undoBtn" title="Undo">Undo</button>
-    <button id="redoBtn" title="Redo">Redo</button>
-    <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <div class="toolbar-left">
+      <button id="addProfileBtn" title="Add Profile Card">Add Profile</button>
+      <button id="addTextBtn" title="Add Text Box">Add Text</button>
+      <button id="deleteSelectedBtn" title="Delete Selected">Delete</button>
+      <button id="undoBtn" title="Undo">Undo</button>
+      <button id="redoBtn" title="Redo">Redo</button>
+      <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
+    </div>
+    <div class="toolbar-right">
+      <input type="text" id="webNameInput" placeholder="Web Name" />
+      <select id="webListDropdown" title="Select Connection Web"></select>
+      <button id="saveWebBtn" title="Save Connection Web">Save</button>
+      <button id="loadWebBtn" title="Load Connection Web">Load</button>
+      <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
+    </div>
   </div>
-  <div class="toolbar-right">
-    <input type="text" id="webNameInput" placeholder="Web Name" />
-    <select id="webListDropdown" title="Select Connection Web"></select>
-    <button id="saveWebBtn" title="Save Connection Web">Save</button>
-    <button id="loadWebBtn" title="Load Connection Web">Load</button>
-    <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
-  </div>
-</div>
 
-<!-- Stage -->
-<div id="stage">
-  <div id="viewport">
-    <div id="world">
+  <!-- Stage -->
+  <div id="stage">
+    <div id="viewport">
       <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
       <div id="cards"></div>
     </div>
   </div>
-</div>
 
-<!-- Editor -->
-<div id="editor">
-  <header>Edit Item</header>
+  <!-- Editor -->
+  <div id="editor">
+    <header>Edit Item</header>
 
-  <label>Profile Picture URL</label>
-  <input id="fImage" type="url" placeholder="https://..." />
+    <label>Profile Picture URL</label>
+    <input id="fImage" type="url" placeholder="https://..." />
 
-  <label>Name</label>
-  <input id="fName" type="text" />
+    <label>Name</label>
+    <input id="fName" type="text" />
 
-  <label>Status</label>
-  <select id="fStatus">
-    <option>Alive</option>
-    <option>Dead</option>
-    <option>Unknown</option>
-  </select>
+    <label>Status</label>
+    <select id="fStatus">
+      <option>Alive</option>
+      <option>Dead</option>
+      <option>Unknown</option>
+    </select>
 
-  <label>Branch</label>
-  <select id="fBranch"></select>
+    <label>Branch</label>
+    <select id="fBranch"></select>
 
-  <label>Subbranch</label>
-  <input id="fSubbranch" type="text" />
+    <label>Subbranch</label>
+    <input id="fSubbranch" type="text" />
 
-  <label>Rank</label>
-  <select id="fRank"></select>
+    <label>Rank</label>
+    <select id="fRank"></select>
 
-  <label>Short Description</label>
-  <textarea id="fDesc"></textarea>
+    <label>Short Description</label>
+    <textarea id="fDesc"></textarea>
 
-  <label>Related Files (choose from database)</label>
-  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;"></select>
-  <div style="display:flex; gap:8px; margin-top:6px;">
-    <button id="btnAttachSelected" type="button">Attach Selected</button>
-    <button id="btnClearRelated" type="button">Clear</button>
-  </div>
-  <div id="relatedList" class="file-list">(none)</div>
+    <label>Related Files (from DB)</label>
+    <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;">
+      <!-- populated from DB: suspects / insurgents / informants -->
+    </select>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" style="flex:1;" />
+      <button id="btnAddRelated" type="button">Add URL</button>
+    </div>
+    <div id="relatedList" class="file-list">(none)</div>
 
-  <label>Other Files (external URL)</label>
-  <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
-  <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
-  <div style="display:flex; gap:8px; margin-top:6px;">
-    <button id="btnAddOther" type="button">Add URL</button>
-  </div>
-  <div id="otherList" class="file-list">(none)</div>
+    <label>Other Files (external URL)</label>
+    <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
+    <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <button id="btnAddOther" type="button">Add URL</button>
+    </div>
+    <div id="otherList" class="file-list">(none)</div>
 
-  <div class="btns">
-    <button class="save" id="btnSave" type="button">Save</button>
-    <button id="btnCancel" type="button">Cancel</button>
-  </div>
-</div>
-
-<!-- Custom Confirm Modal -->
-<div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); 
-     z-index:1000000; justify-content:center; align-items:center;">
-  <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
-    <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
-    <div style="display:flex; justify-content:space-between; gap:10px;">
-      <button id="confirmYesBtn" style="flex:1; background:#c62828; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">Yes</button>
-      <button id="confirmNoBtn" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">No</button>
+    <div class="btns">
+      <button class="save" id="btnSave" type="button">Save</button>
+      <button id="btnCancel" type="button">Cancel</button>
     </div>
   </div>
-</div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000000; justify-content:center; align-items:center;">
+    <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
+      <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
+      <div style="display:flex; justify-content:space-between; gap:10px;">
+        <button id="confirmYesBtn" style="flex:1; background:#c62828; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">Yes</button>
+        <button id="confirmNoBtn" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">No</button>
+      </div>
+    </div>
+  </div>
 
 <script>
-// Firebase config - replace if different
+/* ==========================
+   Firebase config (kept as you provided)
+   ========================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -214,7 +199,9 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// App state
+/* ==========================
+   App state
+   ========================== */
 let cards = [];
 let edges = [];
 let textBoxes = [];
@@ -223,12 +210,11 @@ let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
-let snap = 10;
+const snap = 10;
 let editingTextLabel = false;
 
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
-const world = document.getElementById('world');
 const cardsLayer = document.getElementById('cards');
 const wiresLayer = document.getElementById('wires');
 
@@ -244,34 +230,23 @@ const branchColors = {
 };
 const rankLists = {
   "None":["None"],
-  "United States Army": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"
-  ],
-  "United States Navy": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"
-  ],
-  "United States Marine Corps": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"
-  ],
-  "United States Air Force": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"
-  ],
-  "Taliban": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
-  ],
-  "Taliban Special Forces": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"
-  ],
-  "Al-Qaeda": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
-  ]
+  "United States Army":[ "US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","SMA","CSM","1SG","SFC","SSGT","SGT","CPL","PFC","PV2","PVT" ],
+  "United States Navy":[ "US General","US Lieutenant General","US Major General","Commander","XO","CAPT","CDR","LCDR","LT","LTJG","ENS","MCPON","MCPO","SCPO","CPO","PO1","PO2","PO3","SN","SA","SR" ],
+  "United States Marine Corps":[ "US General","US Lieutenant General","US Major General","Commander","XO","COL","LtCol","Maj","Cpt","1stLt","2ndLt","SgtMajMC","MGySgt","MSgt","GySgt","SSgt","Sgt","Cpl","LCpl","PFC","Pvt" ],
+  "United States Air Force":[ "US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","CMSAF","CMSgt","SMSgt","MSgt","TSgt","SSgt","SrA","A1C","Amn","AB" ],
+  "Taliban":[ "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB" ],
+  "Taliban Special Forces":[ "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII" ],
+  "Al-Qaeda":[ "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB" ]
 };
 
+/* ==========================
+   Helpers
+   ========================== */
 function contrast(hex) {
-  hex = (hex || '').replace('#', '');
-  if (hex.length !== 6) return '#000';
-  const r = parseInt(hex.slice(0,2),16), g= parseInt(hex.slice(2,4),16), b= parseInt(hex.slice(4,6),16);
-  return ((r*299+g*587+b*114)/1000) >= 128 ? '#000' : '#fff';
+  hex = (hex || '').replace('#','');
+  if(hex.length !== 6) return '#000';
+  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  return ((r*299 + g*587 + b*114)/1000) >= 128 ? '#000' : '#fff';
 }
 function fileNameFromUrl(url) {
   if(typeof url !== 'string') return '';
@@ -283,97 +258,43 @@ function toast(msg){
   t.className = 'toast';
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
+  setTimeout(()=>{ t.style.opacity = '0'; setTimeout(()=>t.remove(), 300); }, 1500);
 }
-function applyTransform(){
-  viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
-}
+function applyTransform(){ viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; updateEdges(); }
 function clientToWorld(cx, cy){
-  // Convert screen client coords to world coords (world's coordinate system is same as cardsLayer/wiresLayer)
   const r = stage.getBoundingClientRect();
-  const sx = cx - r.left;
-  const sy = cy - r.top;
+  const sx = cx - r.left, sy = cy - r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
 function snapToGrid(v){ return Math.round(v / snap) * snap; }
 
-function linkListHTML(files) {
-  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
-}
-
-/* ---------- Related files: load from Firebase (suspects/insurgents/informants) ---------- */
-/* Populates the multi-select with optgroups and options from the three DB paths.
-   selected parameter should be an array of {url,name} to pre-select.
-*/
-async function fillRelatedSelect(selected = []) {
-  const sel = document.getElementById("fRelatedSelect");
-  sel.innerHTML = ""; // clear
-
-  const paths = [
-    { key: 'suspects', label: 'Suspects (sp)' },
-    { key: 'insurgents', label: 'Insurgents (ip)' },
-    { key: 'informants', label: 'Informants (ci)' }
-  ];
-
-  for (let entry of paths) {
-    try {
-      const snap = await db.ref(entry.key).once('value');
-      const val = snap.val();
-      if (!val) continue;
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = entry.label;
-      Object.values(val).forEach(file => {
-        const opt = document.createElement('option');
-        // Assume DB record has either url & name, or is a simple string url
-        if (typeof file === 'string') {
-          opt.value = file;
-          opt.textContent = fileNameFromUrl(file);
-        } else {
-          opt.value = file.url || '';
-          opt.textContent = file.name || fileNameFromUrl(file.url || '');
-        }
-        // preselect if in selected list
-        if (selected && selected.some(s => (s.url||'') === (opt.value||''))) opt.selected = true;
-        optgroup.appendChild(opt);
-      });
-      sel.appendChild(optgroup);
-    } catch (err) {
-      console.warn("Failed to load related files from", entry.key, err);
-    }
-  }
-
-  // If there were no options, show placeholder option
-  if (!sel.querySelector('option')) {
-    const opt = document.createElement('option');
-    opt.disabled = true;
-    opt.text = "(no related files in DB)";
-    sel.appendChild(opt);
-  }
-}
-
-/* ---------- Edge drawing & anchor positioning ---------- */
-/* Return anchor center in WORLD coordinates (i.e., the coordinate space used for SVG lines) */
+/* ==========================
+   Anchor center & edge drawing
+   - anchorCenter uses model position (card.x, card.y) combined with anchor offset inside the card DOM.
+   - this avoids visual "unlinking" when zoom/pan.
+   ========================== */
 function anchorCenter(cardId) {
+  const cardModel = cards.find(c => c.id === cardId);
+  if (!cardModel) return null;
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
   const anchorEl = cardEl.querySelector('.anchor');
   if (!anchorEl) return null;
-  const rectAnchor = anchorEl.getBoundingClientRect();
-  const rectStage = stage.getBoundingClientRect();
 
-  // anchor center in screen coordinates relative to stage top-left
-  const axScreen = (rectAnchor.left + rectAnchor.right) / 2 - rectStage.left;
-  const ayScreen = (rectAnchor.top + rectAnchor.bottom) / 2 - rectStage.top;
+  // anchor offset inside card in CSS px (independent of viewport transform)
+  // offsetLeft/Top are relative to the positioned parent (the .card), which matches model coordinates.
+  const offsetX = anchorEl.offsetLeft + anchorEl.offsetWidth / 2;
+  const offsetY = anchorEl.offsetTop + anchorEl.offsetHeight / 2;
 
-  // convert screen coords to world coords using current tx,ty,scale
-  return { x: (axScreen - tx) / scale, y: (ayScreen - ty) / scale };
+  // world coordinates = card model position + offset
+  return { x: cardModel.x + offsetX, y: cardModel.y + offsetY };
 }
 
 function updateEdges() {
   // Clear existing
   while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
+
   edges.forEach(edge => {
-    // Support both legacy and current edge shapes
     const aId = edge.a ? edge.a.card : (edge.from || null);
     const bId = edge.b ? edge.b.card : (edge.to || null);
     const aCard = cards.find(c => c.id === aId);
@@ -382,8 +303,9 @@ function updateEdges() {
     const posA = anchorCenter(aCard.id);
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
+
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    // set coordinates in WORLD space — viewport is transformed visually via CSS
+    // coordinates are in world space (wiresLayer is inside viewport which is transformed)
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
@@ -396,10 +318,17 @@ function updateEdges() {
   });
 }
 
-/* ---------- Rendering cards & textboxes ---------- */
+/* ==========================
+   Rendering: cards & textboxes
+   ========================== */
+function linkListHTML(files) {
+  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+}
+
 function makeCardView(card) {
   const existing = document.getElementById(card.id);
   if (existing) existing.remove();
+
   const c = document.createElement('div');
   c.className = 'card';
   c.id = card.id;
@@ -407,14 +336,16 @@ function makeCardView(card) {
   c.style.top = card.y + 'px';
   c.style.setProperty('--branchGlow', card.data.branchColor || '#4caf50');
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
+
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
+
   c.innerHTML = `
-    <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
+    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor || '#777'}cc;">
     <div class="info">
-      <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
+      <div class="name" style="color:${d.branchColor || '#ccc'}">${d.name || 'Unnamed'}</div>
       <div class="rank">${d.rank || ''}</div>
-      <div class="bar" style="background:${d.branchColor};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
+      <div class="bar" style="background:${d.branchColor || '#777'};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
       <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
       <div class="desc">${d.desc || ''}</div>
       <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
@@ -424,20 +355,27 @@ function makeCardView(card) {
     <div class="anchor" title="Drag to link"></div>
   `;
 
-  // Click to select (but do not interfere when typing inside card's internal fields)
+  // Make anchors clickable but stop propagation for link clicks
+  c.querySelectorAll('a').forEach(a=>{
+    a.addEventListener('click', e => { e.stopPropagation(); /* allow link navigation */ });
+  });
+
+  // Click to select (but don't open when editing text in textbox)
   c.addEventListener('click', e => {
     e.stopPropagation();
     if (editingTextLabel) return;
-    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
-    selected = card.id; selectedType = 'card'; c.classList.add('selected');
+    if (selected){ const prev = document.getElementById(selected); if (prev) prev.classList.remove('selected'); }
+    selected = card.id; selectedType = 'card';
+    c.classList.add('selected');
     openEditor(card.id, 'card');
   });
 
-  // Dragging for cards (ignore pointerdown on anchor)
+  // Dragging for cards (ignore anchor pointerdown)
   let dragging = false;
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
-    if(e.target.classList.contains('anchor')) return;
+    if (e.target.classList.contains('anchor')) return; // anchor has its own handling
+    e.stopPropagation();
     dragging = true;
     c.classList.add('dragging');
     c.setPointerCapture(e.pointerId);
@@ -446,35 +384,31 @@ function makeCardView(card) {
     offset.y = wp.y - card.y;
   });
   c.addEventListener('pointermove', e => {
-    if(!dragging) return;
+    if (!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
     card.x = snapToGrid(wp.x - offset.x);
     card.y = snapToGrid(wp.y - offset.y);
-    // clamp to world bounds to avoid placing outside world
-    card.x = Math.max(0, Math.min(card.x, 5000 - 360));
-    card.y = Math.max(0, Math.min(card.y, 5000 - 120));
     c.style.left = card.x + 'px';
     c.style.top = card.y + 'px';
     updateEdges();
   });
   c.addEventListener('pointerup', e => {
-    if(!dragging) return;
+    if (!dragging) return;
     dragging = false;
     c.classList.remove('dragging');
-    try { c.releasePointerCapture(e.pointerId); } catch{}
+    try { c.releasePointerCapture(e.pointerId); } catch {}
     snapshot();
   });
   c.addEventListener('pointercancel', e => {
     dragging = false;
     c.classList.remove('dragging');
-    try { c.releasePointerCapture(e.pointerId); } catch{}
+    try { c.releasePointerCapture(e.pointerId); } catch {}
   });
 
   cardsLayer.appendChild(c);
   return c;
 }
 
-/* Single, consolidated textbox view with native textarea for smooth resizing */
 function makeTextBoxView(box) {
   const existing = document.getElementById(box.id);
   if (existing) existing.remove();
@@ -493,23 +427,17 @@ function makeTextBoxView(box) {
   if (box.height) textarea.style.height = box.height + 'px';
   textarea.spellcheck = false;
 
-  // Prevent textarea clicks/focus from opening editor
-  textarea.addEventListener('pointerdown', e => {
-    e.stopPropagation(); // stops stage/card click handlers
-  });
+  // Stop pointerdown from bubbling (prevents editor opening)
+  textarea.addEventListener('pointerdown', e => e.stopPropagation());
   textarea.addEventListener('focus', e => { editingTextLabel = true; });
   textarea.addEventListener('blur', e => { editingTextLabel = false; snapshot(); });
 
-  // Keep model content in sync
-  textarea.addEventListener('input', e => {
-    box.content = textarea.value;
-  });
+  textarea.addEventListener('input', e => { box.content = textarea.value; });
 
-  // Dragging wrapper (only when pointerdown outside of the textarea's scroll/resize grab)
+  // Drag wrapper (only when not originating from textarea)
   let dragging = false;
   let offset = {x:0,y:0};
   wrapper.addEventListener('pointerdown', e => {
-    // If pointerdown originates from textarea (e.g. resize handle), do not start drag
     if (e.target === textarea) return;
     e.stopPropagation();
     dragging = true;
@@ -520,19 +448,16 @@ function makeTextBoxView(box) {
     offset.y = wp.y - box.y;
   });
   wrapper.addEventListener('pointermove', e => {
-    if(!dragging) return;
+    if (!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
     box.x = snapToGrid(wp.x - offset.x);
     box.y = snapToGrid(wp.y - offset.y);
-    // clamp
-    box.x = Math.max(0, Math.min(box.x, 5000 - (box.width||300)));
-    box.y = Math.max(0, Math.min(box.y, 5000 - 40));
     wrapper.style.left = box.x + 'px';
     wrapper.style.top = box.y + 'px';
     updateEdges();
   });
   wrapper.addEventListener('pointerup', e => {
-    if(dragging) {
+    if (dragging) {
       dragging = false;
       wrapper.classList.remove('dragging');
       try { wrapper.releasePointerCapture(e.pointerId); } catch {}
@@ -545,13 +470,12 @@ function makeTextBoxView(box) {
     try { wrapper.releasePointerCapture(e.pointerId); } catch {}
   });
 
-  // Observe size changes (native resize) to keep model in sync
+  // Track resize via ResizeObserver
   const ro = new ResizeObserver(entries => {
     for(const ent of entries) {
       const w = Math.round(ent.contentRect.width);
       const h = Math.round(ent.contentRect.height);
-      box.width = w;
-      box.height = h;
+      box.width = w; box.height = h;
       wrapper.style.width = w + 'px';
       snapshot();
       updateEdges();
@@ -559,10 +483,9 @@ function makeTextBoxView(box) {
   });
   ro.observe(textarea);
 
-  // Click wrapper to select and open editor (but clicking inside textarea will not reach here)
   wrapper.addEventListener('click', e => {
     e.stopPropagation();
-    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    if (selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
     selected = box.id; selectedType = 'textbox'; wrapper.classList.add('selected');
     openEditor(box.id, 'textbox');
   });
@@ -572,16 +495,18 @@ function makeTextBoxView(box) {
   return wrapper;
 }
 
-/* ---------- General render ---------- */
+/* General render */
 function render() {
-  // Clear layers then recreate
+  // Clear and re-create
   cardsLayer.innerHTML = '';
   cards.forEach(makeCardView);
   textBoxes.forEach(makeTextBoxView);
   updateEdges();
 }
 
-/* ---------- Snapshot / undo / redo ---------- */
+/* ==========================
+   Snapshot / undo / redo
+   ========================== */
 function snapshot() {
   try {
     const state = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
@@ -590,85 +515,107 @@ function snapshot() {
     redoStack = [];
   } catch (e) { console.warn("Snapshot failed", e); }
 }
-
 function loadState(state) {
   cards.splice(0, cards.length, ...(state.cards || []));
   edges.splice(0, edges.length, ...(state.edges || []));
   textBoxes.splice(0, textBoxes.length, ...(state.textBoxes || []));
-  tx = state.tx || 0;
-  ty = state.ty || 0;
-  scale = state.scale || 1;
+  tx = state.tx || 0; ty = state.ty || 0; scale = state.scale || 1;
   applyTransform();
-  render(); // ensure DOM reflects the loaded world
+  render();
 }
-
 function undo() {
   if (undoStack.length === 0) { toast("Nothing to undo"); return; }
   try {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     redoStack.push(current);
     const prev = undoStack.pop();
-    loadState(prev);
+    if (prev) loadState(prev);
     toast("Undo");
   } catch (e) { console.error(e); }
 }
-
 function redo() {
   if (redoStack.length === 0) { toast("Nothing to redo"); return; }
   try {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(current);
     const nxt = redoStack.pop();
-    loadState(nxt);
+    if (nxt) loadState(nxt);
     toast("Redo");
   } catch (e) { console.error(e); }
 }
 
-/* ---------- Selection / Editor ---------- */
+/* ==========================
+   Editor: selection, open/close
+   - fillRelatedSelect fetches DB groups and fills select box
+   ========================== */
 function deselect() {
   if (selected) {
-    let el = document.getElementById(selected);
-    if (el) el.classList.remove("selected");
+    const el = document.getElementById(selected);
+    if (el) el.classList.remove('selected');
     selected = null; selectedType = null;
   }
   closeEditor();
 }
 function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-/* openEditor is async because it loads the related-select data from Firebase */
+async function fillRelatedSelect(selectedFiles = []) {
+  // Clear select
+  const sel = document.getElementById("fRelatedSelect");
+  sel.innerHTML = "";
+
+  // Paths to fetch from your DB
+  const paths = ["suspects", "insurgents", "informants"];
+  for (let p of paths) {
+    try {
+      const snap = await db.ref(p).once('value');
+      if (!snap.exists()) continue;
+      const group = document.createElement('optgroup');
+      group.label = p;
+      const val = snap.val();
+      // val could be object keyed by id
+      Object.keys(val).forEach(k=>{
+        const fileObj = val[k];
+        const opt = document.createElement('option');
+        opt.value = fileObj.url || fileObj; // support both url string or object
+        opt.textContent = fileObj.name || fileNameFromUrl(fileObj.url || fileObj);
+        // mark selected if already present in card's relatedFiles
+        if (selectedFiles && selectedFiles.some(s => s.url === opt.value)) opt.selected = true;
+        group.appendChild(opt);
+      });
+      sel.appendChild(group);
+    } catch (e) {
+      console.warn("Failed to fetch", p, e);
+    }
+  }
+}
+
 async function openEditor(id, type) {
-  let ed = document.getElementById("editor");
+  const ed = document.getElementById("editor");
   ed.style.display = "block";
 
-  // Reset all fields
+  // Reset visible and values
+  document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
-  fillRankSelect("None", "None");
+  fillRankSelect("None","None");
   document.getElementById("fSubbranch").value = "";
   document.getElementById("fStatus").value = "Unknown";
   document.getElementById("fDesc").value = "";
-
-  // Get the card if type=card
-  const card = (type === "card") ? cards.find(c => c.id === id) : null;
-
-  // Populate related files select from Firebase and preselect current related files
-  await fillRelatedSelect(card ? (card.data.relatedFiles || []) : []);
-
-  // Reset other fields
+  document.getElementById("relatedList").innerHTML = "(none)";
   document.getElementById("otherList").innerHTML = "(none)";
+  document.getElementById("fRelatedUrl").value = "";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
 
   selected = id; selectedType = type;
 
-  // Show or hide appropriate fields
-  if (type === "card" && card) {
-    // Show all editor controls
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
-    // Ensure header visible
-    document.querySelector("#editor header").style.display = "block";
+  if (type === "card") {
+    const card = cards.find(c => c.id === id);
+    // populate related select from DB, with existing selection:
+    await fillRelatedSelect(card ? (card.data.relatedFiles || []) : []);
 
+    if (!card) return;
     document.getElementById("fImage").value = card.data.image || "";
     document.getElementById("fName").value = card.data.name || "";
     fillBranchSelect(card.data.branch);
@@ -682,8 +629,7 @@ async function openEditor(id, type) {
     // Hide everything except header + description label + textarea
     document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
     document.querySelector("#editor header").style.display = "block";
-    const descLabel = Array.from(document.querySelectorAll("#editor label"))
-      .find(l => l.textContent.includes("Short Description"));
+    const descLabel = Array.from(document.querySelectorAll("#editor label")).find(l => l.textContent.includes("Short Description"));
     if (descLabel) descLabel.style.display = "block";
     document.getElementById("fDesc").style.display = "block";
     const box = textBoxes.find(t => t.id === id);
@@ -694,7 +640,7 @@ async function openEditor(id, type) {
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
-  Object.keys(branchColors).forEach(b => {
+  Object.keys(branchColors).forEach(b=>{
     const opt = document.createElement("option");
     opt.value = b; opt.textContent = b;
     if (b === selectedBranch) opt.selected = true;
@@ -704,416 +650,59 @@ function fillBranchSelect(selectedBranch) {
 function fillRankSelect(branch, selectedRank) {
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
-  (rankLists[branch] || ['None']).forEach(r => {
+  (rankLists[branch] || ['None']).forEach(r=>{
     const opt = document.createElement("option");
     opt.value = r; opt.textContent = r;
     if (r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
 }
-function renderFileList(containerId, files) {
+function renderFileList(containerId, files){
   const cont = document.getElementById(containerId);
   cont.innerHTML = "";
-  if (!files || files.length === 0) {
-    cont.textContent = "(none)";
-    return;
-  }
+  if (!files || files.length === 0) { cont.textContent = "(none)"; return; }
   const ul = document.createElement('ul');
   ul.style.margin = '6px 0 0 0';
   ul.style.paddingLeft = '18px';
-  files.forEach(f => {
+  files.forEach(f=>{
     const li = document.createElement('li');
     const a = document.createElement("a");
     a.href = f.url || f;
     a.textContent = f.name || fileNameFromUrl(f.url || f);
     a.target = "_blank"; a.rel = "noopener";
+    // clicking link should not open editor so stop propagation
+    a.addEventListener('click', (e)=> e.stopPropagation());
     li.appendChild(a);
     ul.appendChild(li);
   });
   cont.appendChild(ul);
 }
 
-/* ---------- Toolbar bindings ---------- */
-document.getElementById("addProfileBtn").onclick = ()=>{
-  const pos = { x: 100, y: 100 };
-  const newCard = createDefaultCard(pos);
-  cards.push(newCard);
-  selected = newCard.id; selectedType = 'card';
-  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
-};
-document.getElementById("addTextBtn").onclick = ()=>{
-  const pos = { x: 200, y: 200 };
-  const newBox = createDefaultTextbox(pos);
-  textBoxes.push(newBox);
-  selected = newBox.id; selectedType = 'textbox';
-  makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
-};
-document.getElementById("deleteSelectedBtn").onclick = async function(){
-  if(!selected) { toast("Select a card or textbox first"); return; }
-  const confirmed = await customConfirm("Delete selected item?");
-  if(!confirmed) return;
-
-  if(selectedType === "card"){
-    cards.splice(cards.findIndex(c => c.id === selected), 1);
-    edges = edges.filter(e => {
-      const aId = e.a ? e.a.card : (e.from || null);
-      const bId = e.b ? e.b.card : (e.to || null);
-      return aId !== selected && bId !== selected;
-    });
-  } else if(selectedType === "textbox"){
-    textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
-  }
-  const el = document.getElementById(selected);
-  if(el) el.remove();
-  selected = null; selectedType = null;
-  closeEditor(); render(); snapshot();
-};
-
-document.getElementById("undoBtn").onclick = undo;
-document.getElementById("redoBtn").onclick = redo;
-
-/* ---------- Stage interactions ---------- */
-// Double-click stage to add a card (guard when editing text)
-stage.addEventListener("dblclick", e=>{
-  if (editingTextLabel) return;
-  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
-  const pos = clientToWorld(e.clientX, e.clientY);
-  const newCard = createDefaultCard(pos);
-  cards.push(newCard);
-  selected = newCard.id; selectedType = 'card';
-  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
-});
-
-// Search filtering + focus single-match
-document.getElementById("searchBox").oninput = function(){
-  const query = this.value.toLowerCase();
-  let matches = [];
-  cards.forEach(card=>{
-    const el = document.getElementById(card.id);
-    if(!el) return;
-    const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
-    const shown = !query || text.includes(query);
-    el.style.display = shown ? "flex" : "none";
-    if (shown && query && text.includes(query)) matches.push(card);
-  });
-  textBoxes.forEach(box=>{
-    const el = document.getElementById(box.id);
-    if(!el) return;
-    const text = (box.content || "").toLowerCase();
-    el.style.display = !query || text.includes(query) ? "block" : "none";
-  });
-
-  // If exactly one match, focus it
-  if (matches.length === 1) {
-    focusCard(matches[0]);
-  }
-};
-
-function focusCard(card){
-  const el = document.getElementById(card.id);
-  if(!el) return;
-  // center card in viewport
-  const rect = stage.getBoundingClientRect();
-  const cardCenterX = card.x + 180; // half of 360 width
-  const cardCenterY = card.y + 90;  // approx mid-height of card (top + 90)
-  tx = rect.width / 2 - cardCenterX * scale;
-  ty = rect.height / 2 - cardCenterY * scale;
-  applyTransform();
-  updateEdges();
-
-  // flash highlight
-  el.classList.remove('flash-highlight');
-  void el.offsetWidth;
-  el.classList.add('flash-highlight');
-}
-
-/* ---------- Zoom ---------- */
-stage.addEventListener('wheel', e => {
-  e.preventDefault();
-  const zoomFactor = 1.1;
-  const mousePos = clientToWorld(e.clientX, e.clientY);
-  const oldScale = scale;
-  scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
-  scale = Math.min(Math.max(scale, 0.25), 4);
-  tx = e.clientX - mousePos.x * scale;
-  ty = e.clientY - mousePos.y * scale;
-  applyTransform();
-  updateEdges();
-}, { passive: false });
-
-// Panning
-let isPanning = false;
-let panStart = { x: 0, y: 0 };
-let panOrigin = { tx: 0, ty: 0 };
-stage.addEventListener('pointerdown', e => {
-  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
-  isPanning = true;
-  panStart.x = e.clientX;
-  panStart.y = e.clientY;
-  panOrigin.tx = tx;
-  panOrigin.ty = ty;
-  stage.style.cursor = 'grabbing';
-  stage.setPointerCapture(e.pointerId);
-});
-stage.addEventListener('pointermove', e => {
-  if (!isPanning) return;
-  const dx = e.clientX - panStart.x;
-  const dy = e.clientY - panStart.y;
-  tx = panOrigin.tx + dx;
-  ty = panOrigin.ty + dy;
-  applyTransform();
-  updateEdges();
-});
-stage.addEventListener('pointerup', e => {
-  if (!isPanning) return;
-  isPanning = false;
-  stage.style.cursor = 'grab';
-  try { stage.releasePointerCapture(e.pointerId); } catch{}
-  snapshot();
-});
-stage.addEventListener('pointercancel', e => {
-  if (!isPanning) return;
-  isPanning = false;
-  stage.style.cursor = 'grab';
-  try { stage.releasePointerCapture(e.pointerId); } catch{}
-  snapshot();
-});
-
-/* ---------- Anchor linking (create edges) ---------- */
-let anchorDrag = { active:false, startCardId:null, tmpLine:null };
-
-stage.addEventListener('pointerdown', e => {
-  // Start anchor drag when user presses on an anchor
-  if (e.target.classList.contains('anchor')) {
-    const cardEl = e.target.closest('.card');
-    if (!cardEl) return;
-    anchorDrag.active = true;
-    anchorDrag.startCardId = cardEl.id;
-
-    const svgNS = "http://www.w3.org/2000/svg";
-    anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
-    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff'); // white line
-    anchorDrag.tmpLine.setAttribute('stroke-width', '3');
-    anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
-    wiresLayer.appendChild(anchorDrag.tmpLine);
-
-    const startPos = anchorCenter(anchorDrag.startCardId);
-    if (startPos) {
-      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
-      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
-      anchorDrag.tmpLine.setAttribute('x2', startPos.x);
-      anchorDrag.tmpLine.setAttribute('y2', startPos.y);
-    }
-    try { e.target.setPointerCapture(e.pointerId); } catch {}
-  }
-});
-
-stage.addEventListener('pointermove', e => {
-  if (!anchorDrag.active) return;
-  const pos = clientToWorld(e.clientX, e.clientY);
-  if (anchorDrag.tmpLine) {
-    // keep start anchored to the start card's anchor (in case it moved)
-    const startPos = anchorCenter(anchorDrag.startCardId);
-    if (startPos) {
-      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
-      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
-    }
-    anchorDrag.tmpLine.setAttribute('x2', pos.x);
-    anchorDrag.tmpLine.setAttribute('y2', pos.y);
-  }
-});
-
-stage.addEventListener('pointerup', e => {
-  if (!anchorDrag.active) return;
-  anchorDrag.active = false;
-
-  let targetCard = null;
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  if(el) {
-    const cardEl = el.closest('.card');
-    if(cardEl) targetCard = cardEl.id;
-  }
-
-  if (!targetCard || targetCard === anchorDrag.startCardId) {
-    if (anchorDrag.tmpLine) {
-      anchorDrag.tmpLine.remove();
-      anchorDrag.tmpLine = null;
-    }
-    try { e.target.releasePointerCapture(e.pointerId); } catch {}
-    return;
-  }
-
-  // Prevent duplicate edges
-  if (!edges.some(edge =>
-    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
-    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
-  )) {
-    const newEdge = {
-      id: "e" + Math.random().toString(36).slice(2,9),
-      a: { card: anchorDrag.startCardId },
-      b: { card: targetCard }
-    };
-    edges.push(newEdge);
-    updateEdges();
-    snapshot();
-    render();
-  }
-
-  if (anchorDrag.tmpLine) {
-    anchorDrag.tmpLine.remove();
-    anchorDrag.tmpLine = null;
-  }
-  try { e.target.releasePointerCapture(e.pointerId); } catch {}
-});
-
-/* ---------- Deselect on stage click ---------- */
-stage.addEventListener("click", e=>{
-  if(e.target === stage || e.target === viewport || e.target === world){
-    if(selected){
-      const el = document.getElementById(selected);
-      if(el) el.classList.remove("selected");
-      selected = null; selectedType = null; closeEditor();
-    }
-  }
-});
-
-/* ---------- Firebase: save/load/delete & web list ---------- */
-const webNameInput = document.getElementById('webNameInput');
-const webListDropdown = document.getElementById('webListDropdown');
-let currentWebListener = null;
-
-async function subscribeToWeb(name) {
-  if (currentWebListener) {
-    if(webListDropdown.value) {
-      db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
-    }
-    currentWebListener = null;
-  }
-  if(!name) return;
-  const ref = db.ref(`connectionWebs/${name}`);
-  currentWebListener = ref.on('value', snapshot => {
-    const data = snapshot.val();
-    if (!data) {
-      toast(`No data found for "${name}"`);
-      cards = []; edges = []; textBoxes = [];
-      tx = 0; ty = 0; scale = 1;
-      render();
-      return;
-    }
-    // Restore saved state
-    cards.splice(0, cards.length, ...(data.cards || []));
-    edges.splice(0, edges.length, ...(data.edges || []));
-    textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
-    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
-    applyTransform();
-    render();
-    toast(`Synced with "${name}"`);
-  }, error => { alert("Realtime sync failed: " + error.message); });
-}
-
-webListDropdown.addEventListener("change", (e) => {
-  const name = e.target.value;
-  if (!name) return;
-  localStorage.setItem("lastWeb", name);
-  webNameInput.value = name;
-  subscribeToWeb(name);
-});
-webNameInput.addEventListener("change", (e) => {
-  const name = e.target.value.trim();
-  if (!name) return;
-  localStorage.setItem("lastWeb", name);
-  subscribeToWeb(name);
-  if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
-    const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
-    webListDropdown.appendChild(opt);
-    webListDropdown.value = name;
-  }
-});
-
-async function saveCurrentWeb() {
-  const name = webNameInput.value.trim();
-  if (!name) { alert("Enter a Connection Web name"); return; }
-  // Deep-clone to strip any DOM references
-  const data = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() }));
-  try { await db.ref(`connectionWebs/${name}`).set(data); toast("Connection Web saved!"); }
-  catch (e) { alert("Save failed: " + e.message); }
-}
-async function deleteCurrentWeb() {
-  const name = webListDropdown.value;
-  if (!name) { alert("Select a Connection Web to delete"); return; }
-  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
-  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
-  try {
-    if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
-    await db.ref(`connectionWebs/${name}`).remove();
-    toast("Connection Web deleted");
-    await refreshWebList();
-  } catch (e) { alert("Delete failed: " + e.message); }
-}
-async function refreshWebList() {
-  try {
-    const snapshot = await db.ref('connectionWebs').once('value');
-    const data = snapshot.val() || {};
-    webListDropdown.innerHTML = "";
-    Object.keys(data).sort().forEach(name => {
-      const opt = document.createElement("option");
-      opt.value = name; opt.textContent = name;
-      webListDropdown.appendChild(opt);
-    });
-    let last = localStorage.getItem("lastWeb");
-    if (last && data[last]) {
-      webListDropdown.value = last;
-      webNameInput.value = last;
-      subscribeToWeb(last);
-    }
-  } catch (e) { console.error("Failed to load Connection Webs list:", e); }
-}
-document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
-document.getElementById("loadWebBtn").onclick = () => {
-  const name = webListDropdown.value || webNameInput.value.trim();
-  if(!name) { alert("Pick or type a web name to load"); return; }
-  subscribeToWeb(name);
-};
-document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
-
-/* ---------- Editor: related file attach / other files ---------- */
-document.getElementById("btnAttachSelected").onclick = ()=>{
-  if(!selected || selectedType !== 'card') { toast("Select a card first"); return; }
-  const sel = document.getElementById("fRelatedSelect");
-  const opts = Array.from(sel.selectedOptions);
-  if(opts.length === 0) { toast("Choose one or more related items"); return; }
-  const card = cards.find(c=>c.id === selected);
-  if(!card) return;
+/* Add related URL (manual) */
+document.getElementById("btnAddRelated").onclick = ()=>{
+  if(!selected || selectedType !== 'card') { alert("No card selected"); return; }
+  const url = document.getElementById("fRelatedUrl").value.trim();
+  if (!url) return alert("Enter URL");
+  const card = cards.find(c => c.id === selected);
+  if (!card) return;
   card.data.relatedFiles = card.data.relatedFiles || [];
-  opts.forEach(o=>{
-    if(!card.data.relatedFiles.some(f=>f.url === o.value)) {
-      card.data.relatedFiles.push({ url: o.value, name: o.textContent });
-    }
-  });
-  renderFileList("relatedList", card.data.relatedFiles);
-  snapshot();
+  const name = fileNameFromUrl(url);
+  if (!card.data.relatedFiles.some(f=>f.url === url)) {
+    card.data.relatedFiles.push({url, name});
+    renderFileList("relatedList", card.data.relatedFiles);
+    document.getElementById("fRelatedUrl").value = "";
+    snapshot();
+  }
 };
 
-document.getElementById("btnClearRelated").onclick = ()=>{
-  if(!selected || selectedType !== 'card') { toast("Select a card first"); return; }
-  const card = cards.find(c=>c.id === selected);
-  if(!card) return;
-  card.data.relatedFiles = [];
-  renderFileList("relatedList", []);
-  // clear selection UI
-  const sel = document.getElementById("fRelatedSelect");
-  Array.from(sel.options).forEach(o=> o.selected = false);
-  snapshot();
-};
-
+/* Other file add (manual) */
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return alert("No card selected");
+  if(!selected || selectedType !== 'card') { alert("No card selected"); return; }
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if(!url) return alert("Please enter a URL");
-  const card = cards.find(c=>c.id === selected);
-  if(!card) return;
+  if (!url) return alert("Enter URL");
+  const card = cards.find(c => c.id === selected);
+  if (!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
   card.data.otherFiles.push({url, name});
   renderFileList("otherList", card.data.otherFiles);
@@ -1122,12 +711,18 @@ document.getElementById("btnAddOther").onclick = ()=>{
   snapshot();
 };
 
-/* ---------- Save/cancel in editor ---------- */
+/* Save/cancel */
 document.getElementById("btnSave").onclick = ()=>{
   if(!selected) return;
-  if(selectedType === 'card'){
-    const card = cards.find(c=>c.id === selected);
-    if(!card) return;
+  if (selectedType === 'card') {
+    const card = cards.find(c => c.id === selected);
+    if (!card) return;
+
+    // Read selected related files from fRelatedSelect
+    const sel = document.getElementById("fRelatedSelect");
+    const chosen = Array.from(sel.selectedOptions).map(o=>({ url: o.value, name: o.textContent }));
+    card.data.relatedFiles = chosen;
+
     card.data.image = document.getElementById("fImage").value.trim();
     card.data.name = document.getElementById("fName").value.trim();
     card.data.branch = document.getElementById("fBranch").value;
@@ -1136,19 +731,19 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.status = document.getElementById("fStatus").value;
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
-    // Re-render card
+    // re-render card
     const oldEl = document.getElementById(card.id);
-    if(oldEl) oldEl.remove();
+    if (oldEl) oldEl.remove();
     makeCardView(card);
     updateEdges();
-  } else if(selectedType === 'textbox'){
+  } else if (selectedType === 'textbox') {
     const box = textBoxes.find(t => t.id === selected);
-    if(!box) return;
+    if (!box) return;
     box.content = document.getElementById("fDesc").value.trim();
     const oldEl = document.getElementById(box.id);
-    if(oldEl){
+    if (oldEl) {
       const ta = oldEl.querySelector('textarea');
-      if(ta) ta.value = box.content;
+      if (ta) ta.value = box.content;
     }
   }
   closeEditor();
@@ -1158,13 +753,24 @@ document.getElementById("btnSave").onclick = ()=>{
 document.getElementById("btnCancel").onclick = closeEditor;
 document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
 
-/* ---------- Create new elements ---------- */
+/* ==========================
+   Create default elements
+   - createDefaultCard now places at camera center if provided pos is 'center'
+   ========================== */
+function viewportCenterWorld() {
+  const rect = stage.getBoundingClientRect();
+  const centerClientX = rect.left + rect.width / 2;
+  const centerClientY = rect.top + rect.height / 2;
+  return clientToWorld(centerClientX, centerClientY);
+}
+
 function createDefaultCard(pos){
   const id = "c" + Math.random().toString(36).slice(2,9);
+  const base = (pos === 'center') ? viewportCenterWorld() : pos;
   const newCard = {
     id,
-    x: snapToGrid(Math.max(0, Math.min(pos.x - 180, 5000 - 360))),
-    y: snapToGrid(Math.max(0, Math.min(pos.y - 90, 5000 - 120))),
+    x: snapToGrid((base.x || 100) - 180),
+    y: snapToGrid((base.y || 100) - 90),
     data: {
       image: "https://i.ibb.co/zhKnjbh1/unknownperson.png",
       name: "New Profile",
@@ -1182,48 +788,358 @@ function createDefaultCard(pos){
 }
 function createDefaultTextbox(pos){
   const id = "t" + Math.random().toString(36).slice(2,9);
-  return { id, x: snapToGrid(Math.max(0, Math.min(pos.x, 5000 - 300))), y: snapToGrid(Math.max(0, Math.min(pos.y, 5000 - 40))), content: "", width: 300, height: null };
+  return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300, height: null };
 }
 
-/* ---------- Misc ---------- */
-// Deselect on background / stage click (extra)
-document.addEventListener("click", (e) => {
-  if (e.target.closest('#toolbar') || e.target.closest('#editor')) return;
-}, false);
+/* ==========================
+   Toolbar bindings
+   ========================== */
+document.getElementById("addProfileBtn").onclick = ()=>{
+  const newCard = createDefaultCard('center'); // spawn at camera center
+  cards.push(newCard);
+  selected = newCard.id; selectedType = 'card';
+  makeCardView(newCard);
+  snapshot();
+  render();
+  openEditor(newCard.id, 'card');
+};
+document.getElementById("addTextBtn").onclick = ()=>{
+  const pos = viewportCenterWorld();
+  const newBox = createDefaultTextbox(pos);
+  textBoxes.push(newBox);
+  selected = newBox.id; selectedType = 'textbox';
+  makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
+};
+document.getElementById("deleteSelectedBtn").onclick = async function(){
+  if(!selected) { toast("Select a card or textbox first"); return; }
+  const confirmed = await customConfirm("Delete selected item?");
+  if(!confirmed) return;
+  if(selectedType === "card"){
+    cards.splice(cards.findIndex(c => c.id === selected), 1);
+    edges = edges.filter(e => {
+      const aId = e.a ? e.a.card : (e.from || null);
+      const bId = e.b ? e.b.card : (e.to || null);
+      return aId !== selected && bId !== selected;
+    });
+  } else if(selectedType === "textbox"){
+    textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
+  }
+  const el = document.getElementById(selected);
+  if(el) el.remove();
+  selected = null; selectedType = null;
+  closeEditor(); render(); snapshot();
+};
+document.getElementById("undoBtn").onclick = undo;
+document.getElementById("redoBtn").onclick = redo;
 
+/* ==========================
+   Stage interactions (dblclick add, search)
+   ========================== */
+stage.addEventListener("dblclick", e=>{
+  if (editingTextLabel) return;
+  if (e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  const newCard = createDefaultCard(pos);
+  cards.push(newCard);
+  selected = newCard.id; selectedType = 'card';
+  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
+});
+
+document.getElementById("searchBox").oninput = function(){
+  const query = this.value.toLowerCase();
+  let matches = [];
+  cards.forEach(card=>{
+    const el = document.getElementById(card.id);
+    if(!el) return;
+    const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
+    const shown = !query || text.includes(query);
+    el.style.display = shown ? "flex" : "none";
+    if (shown && query && text.includes(query)) matches.push(card);
+  });
+  textBoxes.forEach(box=>{
+    const el = document.getElementById(box.id);
+    if(!el) return;
+    const text = (box.content || "").toLowerCase();
+    el.style.display = !query || text.includes(query) ? "block" : "none";
+  });
+  if (matches.length === 1) focusCard(matches[0]);
+};
+
+function focusCard(card){
+  const el = document.getElementById(card.id);
+  if(!el) return;
+  const rect = stage.getBoundingClientRect();
+  const cardCenterX = card.x + 180;
+  const cardCenterY = card.y + 90;
+  tx = rect.width / 2 - cardCenterX * scale;
+  ty = rect.height / 2 - cardCenterY * scale;
+  applyTransform();
+  updateEdges();
+  el.classList.remove('flash-highlight');
+  void el.offsetWidth;
+  el.classList.add('flash-highlight');
+}
+
+/* ==========================
+   Zoom & pan
+   ========================== */
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomFactor = 1.1;
+  const mousePos = clientToWorld(e.clientX, e.clientY);
+  scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
+  scale = Math.min(Math.max(scale, 0.25), 4);
+  tx = e.clientX - mousePos.x * scale;
+  ty = e.clientY - mousePos.y * scale;
+  applyTransform();
+}, { passive: false });
+
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let panOrigin = { tx: 0, ty: 0 };
+stage.addEventListener('pointerdown', e => {
+  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
+  isPanning = true;
+  panStart.x = e.clientX; panStart.y = e.clientY;
+  panOrigin.tx = tx; panOrigin.ty = ty;
+  stage.style.cursor = 'grabbing';
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e => {
+  if (!isPanning) return;
+  const dx = e.clientX - panStart.x, dy = e.clientY - panStart.y;
+  tx = panOrigin.tx + dx; ty = panOrigin.ty + dy;
+  applyTransform();
+});
+stage.addEventListener('pointerup', e => {
+  if (!isPanning) return;
+  isPanning = false; stage.style.cursor = 'grab';
+  try { stage.releasePointerCapture(e.pointerId); } catch {}
+  snapshot();
+});
+stage.addEventListener('pointercancel', e => {
+  if (!isPanning) return;
+  isPanning = false; stage.style.cursor = 'grab';
+  try { stage.releasePointerCapture(e.pointerId); } catch {}
+  snapshot();
+});
+
+/* ==========================
+   Anchor linking (create edges)
+   - uses model-world anchorCenter positions so lines stay attached during zoom/pan
+   ========================== */
+let anchorDrag = { active:false, startCardId:null, tmpLine:null };
+
+stage.addEventListener('pointerdown', e => {
+  if (e.target.classList.contains('anchor')) {
+    const cardEl = e.target.closest('.card');
+    if (!cardEl) return;
+    anchorDrag.active = true;
+    anchorDrag.startCardId = cardEl.id;
+    const svgNS = "http://www.w3.org/2000/svg";
+    anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff');
+    anchorDrag.tmpLine.setAttribute('stroke-width', '3');
+    anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
+    wiresLayer.appendChild(anchorDrag.tmpLine);
+    const startPos = anchorCenter(anchorDrag.startCardId);
+    if (startPos) {
+      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
+      anchorDrag.tmpLine.setAttribute('x2', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y2', startPos.y);
+    }
+    try { e.target.setPointerCapture(e.pointerId); } catch {}
+  }
+});
+
+stage.addEventListener('pointermove', e => {
+  if (!anchorDrag.active) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  const startPos = anchorCenter(anchorDrag.startCardId);
+  if (anchorDrag.tmpLine && startPos) {
+    anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+    anchorDrag.tmpLine.setAttribute('y1', startPos.y);
+    anchorDrag.tmpLine.setAttribute('x2', pos.x);
+    anchorDrag.tmpLine.setAttribute('y2', pos.y);
+  }
+});
+
+stage.addEventListener('pointerup', e => {
+  if (!anchorDrag.active) return;
+  anchorDrag.active = false;
+  let targetCard = null;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (el) {
+    const cardEl = el.closest('.card');
+    if (cardEl) targetCard = cardEl.id;
+  }
+  if (!targetCard || targetCard === anchorDrag.startCardId) {
+    if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
+    try { e.target.releasePointerCapture(e.pointerId); } catch {}
+    return;
+  }
+  // Prevent duplicate edges
+  const exists = edges.some(edge=>{
+    const aId = edge.a ? edge.a.card : (edge.from || null);
+    const bId = edge.b ? edge.b.card : (edge.to || null);
+    return (aId === anchorDrag.startCardId && bId === targetCard) || (aId === targetCard && bId === anchorDrag.startCardId);
+  });
+  if (!exists) {
+    const newEdge = { id: "e" + Math.random().toString(36).slice(2,9), a: { card: anchorDrag.startCardId }, b: { card: targetCard } };
+    edges.push(newEdge);
+    updateEdges(); snapshot(); render();
+  }
+  if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
+  try { e.target.releasePointerCapture(e.pointerId); } catch {}
+});
+
+/* Deselect click on stage background */
+stage.addEventListener("click", e=>{
+  if (e.target === stage || e.target === viewport) {
+    if (selected) {
+      const el = document.getElementById(selected);
+      if (el) el.classList.remove('selected');
+      selected = null; selectedType = null; closeEditor();
+    }
+  }
+});
+
+/* ==========================
+   Firebase save/load/list
+   ========================== */
+const webNameInput = document.getElementById('webNameInput');
+const webListDropdown = document.getElementById('webListDropdown');
+let currentWebListener = null;
+
+async function subscribeToWeb(name) {
+  if (currentWebListener && webListDropdown.value) {
+    db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+    currentWebListener = null;
+  }
+  if (!name) return;
+  const ref = db.ref(`connectionWebs/${name}`);
+  currentWebListener = ref.on('value', snapshot=>{
+    const data = snapshot.val();
+    if (!data) {
+      toast(`No data found for "${name}"`);
+      cards = []; edges = []; textBoxes = [];
+      tx = 0; ty = 0; scale = 1;
+      render();
+      return;
+    }
+    // restore
+    cards.splice(0, cards.length, ...(data.cards || []));
+    edges.splice(0, edges.length, ...(data.edges || []));
+    textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
+    tx = (typeof data.tx === 'number') ? data.tx : 0;
+    ty = (typeof data.ty === 'number') ? data.ty : 0;
+    scale = data.scale || 1;
+    applyTransform(); render();
+    toast(`Synced with "${name}"`);
+  }, error => alert("Realtime sync failed: " + (error && error.message)));
+}
+
+webListDropdown.addEventListener("change", (e) => {
+  const name = e.target.value;
+  if (!name) return;
+  localStorage.setItem("lastWeb", name);
+  webNameInput.value = name;
+  subscribeToWeb(name);
+});
+webNameInput.addEventListener("change", (e) => {
+  const name = e.target.value.trim();
+  if (!name) return;
+  localStorage.setItem("lastWeb", name);
+  subscribeToWeb(name);
+  if (!Array.from(webListDropdown.options).some(opt=>opt.value === name)) {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    webListDropdown.appendChild(opt);
+    webListDropdown.value = name;
+  }
+});
+
+async function refreshWebList() {
+  try {
+    const snapshot = await db.ref('connectionWebs').once('value');
+    const data = snapshot.val() || {};
+    webListDropdown.innerHTML = "";
+    Object.keys(data).sort().forEach(name=>{
+      const opt = document.createElement('option'); opt.value = name; opt.textContent = name;
+      webListDropdown.appendChild(opt);
+    });
+    const last = localStorage.getItem("lastWeb");
+    if (last && data[last]) {
+      webListDropdown.value = last; webNameInput.value = last; subscribeToWeb(last);
+    }
+  } catch (e) { console.error(e); }
+}
+
+async function saveCurrentWeb() {
+  const name = webNameInput.value.trim();
+  if (!name) { alert("Enter a Connection Web name"); return; }
+  // Deep clone state
+  const data = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() }));
+  try {
+    await db.ref(`connectionWebs/${name}`).set(data);
+    toast("Connection Web saved!");
+    await refreshWebList();
+  } catch (e) { alert("Save failed: " + e.message); }
+}
+async function deleteCurrentWeb() {
+  const name = webListDropdown.value;
+  if (!name) { alert("Select a Connection Web to delete"); return; }
+  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
+  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
+  try {
+    if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
+    await db.ref(`connectionWebs/${name}`).remove();
+    toast("Connection Web deleted");
+    await refreshWebList();
+  } catch (e) { alert("Delete failed: " + e.message); }
+}
+document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
+document.getElementById("loadWebBtn").onclick = () => {
+  const name = webListDropdown.value || webNameInput.value.trim();
+  if (!name) { alert("Pick or type a web name to load"); return; }
+  subscribeToWeb(name);
+};
+document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
+
+/* ==========================
+   Custom confirm modal
+   ========================== */
 function customConfirm(message) {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const modal = document.getElementById("confirmModal");
     const msgEl = document.getElementById("confirmMessage");
     const yesBtn = document.getElementById("confirmYesBtn");
     const noBtn = document.getElementById("confirmNoBtn");
-
     msgEl.textContent = message;
     modal.style.display = "flex";
-
-    const cleanup = () => {
-      modal.style.display = "none";
-      yesBtn.onclick = null;
-      noBtn.onclick = null;
-    };
-
-    yesBtn.onclick = () => { cleanup(); resolve(true); };
-    noBtn.onclick = () => { cleanup(); resolve(false); };
+    const cleanup = ()=>{ modal.style.display = "none"; yesBtn.onclick = null; noBtn.onclick = null; };
+    yesBtn.onclick = ()=>{ cleanup(); resolve(true); };
+    noBtn.onclick = ()=>{ cleanup(); resolve(false); };
   });
 }
 
-// Initialize
-document.addEventListener("DOMContentLoaded", async ()=>{
-  await refreshWebList();
-  // Populate branch/rank selects initially
-  fillBranchSelect("None");
-  fillRankSelect("None", "None");
+/* ==========================
+   Init
+   ========================== */
+document.addEventListener("DOMContentLoaded", ()=>{
+  refreshWebList();
   render();
-  // initial snapshot
   snapshot();
 });
 
-// Keyboard shortcuts: Ctrl+Z / Ctrl+Y
+/* Prevent unwanted selection from interfering */
+document.addEventListener('selectstart', e => {
+  // prevent selection on cards area -- allow selection for textarea inside textbox
+  if (e.target.closest('.card') || e.target.closest('.textbox-wrapper')) e.preventDefault();
+}, false);
+
+/* Keyboard shortcuts */
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
