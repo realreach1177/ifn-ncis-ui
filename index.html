@@ -28,25 +28,8 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   background-size:40px 40px;
 }
 #viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
-
-/* finite map container */
-#map {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 5000px;
-  height: 5000px;
-  transform: translate(-50%, -50%); /* center the map inside viewport initially */
-  background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(0,0,0,0.02));
-  border: 2px solid rgba(255,255,255,0.06);
-  box-shadow: 0 6px 30px rgba(0,0,0,0.7);
-  overflow: visible;
-}
-
-/* wires and cards are children of #map */
 #wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1; }
 #cards { position:absolute; left:0; top:0; width:100%; height:100%; }
-
 /* Cards and textboxes */
 .card, .textbox-wrapper {
   position: absolute;
@@ -69,7 +52,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   align-items: flex-start;
   gap: 12px;
   overflow: visible;   /* so anchor isn't clipped */
-  border: 1px solid rgba(255,255,255,0.03);
 }
 
 .textbox-wrapper {
@@ -159,15 +141,15 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .dead { background: #e53935; }
 .unknown { background: #212121; border: 1.5px solid #78909c; }
 
-/* anchor dot: top-of-card, slightly lowered from the absolute top so it appears attached */
+/* anchor dot sits near top-center of card; tweak top to move up/down */
 .anchor {
   position: absolute;
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid #000000;
-  top: -8px;            /* tweak to move anchor slightly lower/ higher */
+  background: #ffffff;           /* white for max contrast */
+  border: 2px solid #000000;     /* black border */
+  top: -6px;                     /* small negative to float slightly above card top */
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
@@ -221,10 +203,8 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 <!-- Stage -->
 <div id="stage">
   <div id="viewport">
-    <div id="map">
-      <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
-      <div id="cards"></div>
-    </div>
+    <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
+    <div id="cards"></div>
   </div>
 </div>
 <!-- Editor -->
@@ -249,11 +229,10 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
 
+  <!-- Related files SELECT — populated from Firebase (sp/ip/ci fallback suspects/insurgents/informants) -->
   <label>Related Files</label>
-  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;">
-    <!-- Options will be loaded from Firebase (suspects, insurgents, informants) -->
-  </select>
-  <div id="relatedListPreview" class="file-list" style="margin-top:8px;">(none selected)</div>
+  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;"></select>
+  <div id="relatedList" class="file-list">(none)</div>
 
   <label>Other Files (external URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
@@ -311,7 +290,6 @@ let editingTextLabel = false;
 
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
-const mapEl = document.getElementById('map');
 const cardsLayer = document.getElementById('cards');
 const wiresLayer = document.getElementById('wires');
 
@@ -328,25 +306,25 @@ const branchColors = {
 const rankLists = {
   "None":["None"],
   "United States Army": [
-    "US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","SMA","CSM","1SG","SFC","SSGT","SGT","CPL","PFC","PV2","PVT"
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"
   ],
   "United States Navy": [
-    "US General","US Lieutenant General","US Major General","Commander","XO","CAPT","CDR","LCDR","LT","LTJG","ENS","MCPON","MCPO","SCPO","CPO","PO1","PO2","PO3","SN","SA","SR"
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"
   ],
   "United States Marine Corps": [
-    "US General","US Lieutenant General","US Major General","Commander","XO","COL","LtCol","Maj","Cpt","1stLt","2ndLt","SgtMajMC","MGySgt","MSgt","GySgt","SSgt","Sgt","Cpl","LCpl","PFC","Pvt"
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"
   ],
   "United States Air Force": [
-    "US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","CMSAF","CMSgt","SMSgt","MSgt","TSgt","SSgt","SrA","A1C","Amn","AB"
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"
   ],
   "Taliban": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
   ],
   "Taliban Special Forces": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"
   ],
   "Al-Qaeda": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
   ]
 };
 
@@ -369,16 +347,11 @@ function toast(msg){
   setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
 }
 function applyTransform(){
-  // translate the viewport content (map) by tx/ty and scale
-  // We transform the map element so wires and cards are consistent.
-  mapEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
 function clientToWorld(cx, cy){
-  // convert client coordinates (mouse) to world coordinates inside the map
-  const r = mapEl.getBoundingClientRect();
-  const sx = cx - r.left;
-  const sy = cy - r.top;
-  // inverse of current transform: world = (screen - tx)/scale
+  const r=stage.getBoundingClientRect();
+  const sx=cx-r.left, sy=cy-r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
 function snapToGrid(v){ return Math.round(v / snap) * snap; }
@@ -387,91 +360,94 @@ function linkListHTML(files) {
   return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
 }
 
-/* ---------- Related files select population (Firebase) ---------- */
-/* Populate the related files <select> from three DB paths. selectedArg is an array of {url,name}. */
-async function fillRelatedSelect(selectedArg = []) {
-  const sel = document.getElementById("fRelatedSelect");
-  sel.innerHTML = '';
-  const preview = document.getElementById("relatedListPreview");
-  preview.textContent = "(none selected)";
-
-  const groups = [
-    {path: 'suspects', label: 'Suspects'},
-    {path: 'insurgents', label: 'Insurgents'},
-    {path: 'informants', label: 'Informants'}
-  ];
-
-  for (const g of groups) {
-    try {
-      const snap = await db.ref(g.path).once('value');
-      if (!snap.exists()) continue;
-      const data = snap.val();
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = g.label;
-      Object.keys(data).forEach(key => {
-        const f = data[key];
-        const opt = document.createElement('option');
-        opt.value = f.url || (f.path || '');
-        opt.textContent = f.name || fileNameFromUrl(f.url || f.path || '');
-        // mark selected if present in selectedArg
-        if (Array.isArray(selectedArg) && selectedArg.some(s => (s.url || s) === opt.value)) {
-          opt.selected = true;
-        }
-        optgroup.appendChild(opt);
-      });
-      sel.appendChild(optgroup);
-    } catch (err) {
-      console.warn('Failed to load related group', g.path, err);
-    }
+/* ---------- Related files select population ---------- */
+/*
+  We'll populate #fRelatedSelect with entries fetched from several DB paths.
+  The DB paths we look for (in order) are:
+     'sp' (suspect), 'ip' (insurgent), 'ci' (informant)
+  and we also fallback to 'suspects', 'insurgents', 'informants' if the short codes are not present.
+  Each DB node is expected to hold objects with fields { url: "...", name: "..." } or strings (URL).
+*/
+async function fetchFilesFromPath(path) {
+  try {
+    const snap = await db.ref(path).once('value');
+    const val = snap.val();
+    if (!val) return [];
+    // convert to array of {url,name}
+    return Object.values(val).map(item => {
+      if (typeof item === 'string') return { url: item, name: fileNameFromUrl(item) };
+      return { url: item.url || item.file || item.link || '', name: item.name || fileNameFromUrl(item.url || item.file || item.link || '') };
+    }).filter(f => f.url);
+  } catch (e) {
+    console.warn("Failed to read", path, e);
+    return [];
   }
+}
 
-  // update preview
-  const updatePreview = () => {
-    const chosen = Array.from(sel.selectedOptions).map(o => ({url: o.value, name: o.textContent}));
-    if (!chosen.length) { preview.textContent = "(none selected)"; return; }
-    preview.innerHTML = '<ul style="margin:6px 0 0 18px;padding:0;">' + chosen.map(c=>`<li><a href="${c.url}" target="_blank" rel="noopener">${c.name}</a></li>`).join('') + '</ul>';
-  };
-  sel.addEventListener('change', updatePreview);
-  // initial preview
-  updatePreview();
+async function fillRelatedSelect(preselected = []) {
+  const sel = document.getElementById("fRelatedSelect");
+  sel.innerHTML = "";
+  const tried = ['sp','ip','ci','suspects','insurgents','informants'];
+  const addedUrls = new Set();
+  for (const p of tried) {
+    const files = await fetchFilesFromPath(p);
+    if (!files || files.length === 0) continue;
+    const group = document.createElement('optgroup');
+    group.label = p;
+    files.forEach(f => {
+      if (addedUrls.has(f.url)) return;
+      addedUrls.add(f.url);
+      const opt = document.createElement("option");
+      opt.value = f.url;
+      opt.textContent = f.name || fileNameFromUrl(f.url);
+      // mark selected if in preselected
+      if (Array.isArray(preselected) && preselected.some(s => (s.url || s) === f.url)) opt.selected = true;
+      group.appendChild(opt);
+    });
+    sel.appendChild(group);
+  }
+  // also include any preselected items that weren't found in DB (so we don't lose them)
+  (preselected || []).forEach(p => {
+    const url = p.url || p;
+    if (!url) return;
+    if (addedUrls.has(url)) return;
+    const opt = document.createElement("option");
+    opt.value = url;
+    opt.textContent = p.name || fileNameFromUrl(url);
+    opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // update visible relatedList (for quick links)
+  updateRelatedListFromSelect();
+}
+function updateRelatedListFromSelect() {
+  const sel = document.getElementById("fRelatedSelect");
+  const arr = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
+  renderFileList("relatedList", arr);
 }
 
 /* ---------- Edge drawing & anchor positioning ---------- */
-/* Calculate anchor center in WORLD coordinates using model positions and anchor offset */
+/* Return anchor center in WORLD coordinates.
+   We compute using the model world coords (card.x/card.y) plus the anchor element's offset within the card.
+   This avoids visual de-sync when CSS transforms (zoom/pan) are applied to the viewport.
+*/
 function anchorCenter(cardId) {
-  // Find card model
   const cardModel = cards.find(c => c.id === cardId);
-  if (!cardModel) return null;
-
-  // Anchor X: card.x + half card width (card width is 360)
-  const anchorX = cardModel.x + 360 / 2;
-
-  // Anchor Y: card.y + computed anchor top from CSS + anchor height/2
-  // We'll read the DOM anchor style for the top offset (in px)
   const cardEl = document.getElementById(cardId);
-  if (!cardEl) {
-    // fallback: place at card top
-    return { x: anchorX, y: cardModel.y };
-  }
+  if (!cardModel || !cardEl) return null;
   const anchorEl = cardEl.querySelector('.anchor');
-  let anchorOffsetTop = -8; // default top from CSS if we can't compute
-  let anchorHeightHalf = 8;
-  if (anchorEl) {
-    const cs = getComputedStyle(anchorEl);
-    const topVal = parseFloat(cs.top || anchorOffsetTop);
-    if (!isNaN(topVal)) anchorOffsetTop = topVal;
-    anchorHeightHalf = (anchorEl.offsetHeight || 16) / 2;
-  }
-  const anchorY = cardModel.y + anchorOffsetTop + anchorHeightHalf;
-  return { x: anchorX, y: anchorY };
+  if (!anchorEl) return null;
+  // offsetLeft/offsetTop are relative to cardEl (position:relative) and in CSS px -> same world units as card.x/y
+  const ax_world = cardModel.x + anchorEl.offsetLeft + anchorEl.offsetWidth / 2;
+  const ay_world = cardModel.y + anchorEl.offsetTop + anchorEl.offsetHeight / 2;
+  return { x: ax_world, y: ay_world };
 }
 
-/* Draw/update all edges */
 function updateEdges() {
   // Clear existing
   while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
   edges.forEach(edge => {
-    // Support both legacy and current edge shapes
     const aId = edge.a ? edge.a.card : (edge.from || null);
     const bId = edge.b ? edge.b.card : (edge.to || null);
     const aCard = cards.find(c => c.id === aId);
@@ -481,7 +457,6 @@ function updateEdges() {
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    // set coordinates in WORLD space — map element is transformed (scale/translate)
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
@@ -508,7 +483,7 @@ function makeCardView(card) {
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
   c.innerHTML = `
-    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
+    <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
       <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
       <div class="rank">${d.rank || ''}</div>
@@ -527,7 +502,6 @@ function makeCardView(card) {
     if (editingTextLabel) return;
     if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
     selected = card.id; selectedType = 'card'; c.classList.add('selected');
-    // openEditor is async; but we don't await here (fine)
     openEditor(card.id, 'card');
   });
 
@@ -536,7 +510,6 @@ function makeCardView(card) {
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
     if(e.target.classList.contains('anchor')) return;
-    e.stopPropagation();
     dragging = true;
     c.classList.add('dragging');
     c.setPointerCapture(e.pointerId);
@@ -708,7 +681,7 @@ function undo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     redoStack.push(current);
     const prev = undoStack.pop();
-    loadState(prev);
+    loadState(prev);   // loadState already calls render()
     toast("Undo");
   } catch (e) { console.error(e); }
 }
@@ -719,7 +692,7 @@ function redo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(current);
     const nxt = redoStack.pop();
-    loadState(nxt);
+    loadState(nxt);  // loadState now does render()
     toast("Redo");
   } catch (e) { console.error(e); }
 }
@@ -734,14 +707,22 @@ function deselect() {
   }
   closeEditor();
 }
-function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-/* Open editor - async because we fetch related files from Firebase */
+function closeEditor() { 
+  document.getElementById("editor").style.display = "none"; 
+}
+
+/*
+  Single openEditor implementation — async so it can await related-files population.
+  Behavior:
+  - When type === "card": show full editor and populate fields + related select (from DB).
+  - When type === "textbox": show only the description textarea.
+*/
 async function openEditor(id, type) {
   let ed = document.getElementById("editor");
   ed.style.display = "block";
 
-  // Reset all fields
+  // Reset all fields quickly
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
@@ -749,24 +730,24 @@ async function openEditor(id, type) {
   document.getElementById("fSubbranch").value = "";
   document.getElementById("fStatus").value = "Unknown";
   document.getElementById("fDesc").value = "";
-
-  // Get the card if type=card
-  const card = (type === "card") ? cards.find(c => c.id === id) : null;
-
-  // Populate related files select from Firebase (selected set to card.data.relatedFiles if present)
-  await fillRelatedSelect(card ? card.data.relatedFiles : []);
-
-  // Reset other fields
   document.getElementById("otherList").innerHTML = "(none)";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
 
-  selected = id; 
+  selected = id;
   selectedType = type;
 
-  if (type === "card" && card) {
-    // Show everything
+  if (type === "card") {
+    // show full editor
     document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
+    const card = cards.find(c => c.id === id);
+    if (!card) return;
+    // populate related select from DB — pass the current card relatedFiles so selections are marked
+    await fillRelatedSelect(card.data.relatedFiles || []);
+    // also show list of selected related links
+    updateRelatedListFromSelect();
+
+    // populate rest of values
     document.getElementById("fImage").value = card.data.image || "";
     document.getElementById("fName").value = card.data.name || "";
     fillBranchSelect(card.data.branch);
@@ -775,9 +756,8 @@ async function openEditor(id, type) {
     document.getElementById("fStatus").value = card.data.status || "Unknown";
     document.getElementById("fDesc").value = card.data.desc || "";
     renderFileList("otherList", card.data.otherFiles);
-  } 
-  else if (type === "textbox") {
-    // Hide everything except header + description label + textarea
+  } else {
+    // textbox type: hide all except header + description
     document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
     document.querySelector("#editor header").style.display = "block";
 
@@ -792,7 +772,6 @@ async function openEditor(id, type) {
   }
 }
 
-/* Fill branch select and rank select helpers */
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
@@ -835,12 +814,12 @@ function renderFileList(containerId, files) {
   cont.appendChild(ul);
 }
 
-/* ---------- Editor: URL handlers (kept) ---------- */
+/* ---------- Editor: button handlers ---------- */
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return alert("No card selected");
+  if(!selected || selectedType !== 'card') { toast("No card selected"); return; }
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if(!url) return alert("Please enter a URL");
+  if(!url) { alert("Please enter a URL"); return; }
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
@@ -850,6 +829,48 @@ document.getElementById("btnAddOther").onclick = ()=>{
   document.getElementById("fOtherName").value = "";
   snapshot();
 };
+
+// when user changes selection in related select, update the small list preview
+document.getElementById("fRelatedSelect").addEventListener('change', updateRelatedListFromSelect);
+
+// Save/cancel in editor
+document.getElementById("btnSave").onclick = ()=>{
+  if(!selected) return;
+  if(selectedType === 'card'){
+    const card = cards.find(c=>c.id === selected);
+    if(!card) return;
+    card.data.image = document.getElementById("fImage").value.trim();
+    card.data.name = document.getElementById("fName").value.trim();
+    card.data.branch = document.getElementById("fBranch").value;
+    card.data.subbranch = document.getElementById("fSubbranch").value.trim();
+    card.data.rank = document.getElementById("fRank").value;
+    card.data.status = document.getElementById("fStatus").value;
+    card.data.desc = document.getElementById("fDesc").value.trim();
+    card.data.branchColor = branchColors[card.data.branch] || "#777";
+    // related files: read from select
+    const sel = document.getElementById("fRelatedSelect");
+    card.data.relatedFiles = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
+    // Re-render card
+    const oldEl = document.getElementById(card.id);
+    if(oldEl) oldEl.remove();
+    makeCardView(card);
+    updateEdges();
+  } else if(selectedType === 'textbox'){
+    const box = textBoxes.find(t => t.id === selected);
+    if(!box) return;
+    box.content = document.getElementById("fDesc").value.trim();
+    const oldEl = document.getElementById(box.id);
+    if(oldEl){
+      const ta = oldEl.querySelector('textarea');
+      if(ta) ta.value = box.content;
+    }
+  }
+  closeEditor();
+  snapshot();
+  render();
+};
+document.getElementById("btnCancel").onclick = closeEditor;
+document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
 
 /* ---------- Create new elements ---------- */
 function createDefaultCard(pos){
@@ -900,7 +921,7 @@ document.getElementById("deleteSelectedBtn").onclick = async function(){
 
   if(selectedType === "card"){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
-    edges = edges.filter(e => (e.a && e.a.card) !== selected && (e.b && e.b.card) !== selected);
+    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
   } else if(selectedType === "textbox"){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
   }
@@ -954,11 +975,11 @@ function focusCard(card){
   const el = document.getElementById(card.id);
   if(!el) return;
   // center card in viewport
-  const rect = mapEl.getBoundingClientRect();
+  const rect = stage.getBoundingClientRect();
   const cardCenterX = card.x + 180; // half of 360 width
   const cardCenterY = card.y + 90;  // approx mid-height of card (top + 90)
-  tx = (window.innerWidth/2) - cardCenterX * scale;
-  ty = (window.innerHeight/2) - cardCenterY * scale;
+  tx = rect.width / 2 - cardCenterX * scale;
+  ty = rect.height / 2 - cardCenterY * scale;
   applyTransform();
   updateEdges();
 
@@ -1106,6 +1127,7 @@ stage.addEventListener('pointerup', e => {
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
 
+
 /* ---------- Deselect on stage click ---------- */
 stage.addEventListener("click", e=>{
   if(e.target === stage || e.target === viewport){
@@ -1230,8 +1252,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   // initial snapshot
   snapshot();
 });
-
-/* Custom confirm */
 function customConfirm(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirmModal");
@@ -1253,48 +1273,7 @@ function customConfirm(message) {
   });
 }
 
-/* ---------- Save button: persist edited fields back to model ---------- */
-document.getElementById("btnSave").onclick = () => {
-  if(!selected) return;
-  if(selectedType === 'card'){
-    const card = cards.find(c=>c.id === selected);
-    if(!card) return;
-    card.data.image = document.getElementById("fImage").value.trim();
-    card.data.name = document.getElementById("fName").value.trim();
-    card.data.branch = document.getElementById("fBranch").value;
-    card.data.subbranch = document.getElementById("fSubbranch").value.trim();
-    card.data.rank = document.getElementById("fRank").value;
-    card.data.status = document.getElementById("fStatus").value;
-    card.data.desc = document.getElementById("fDesc").value.trim();
-    card.data.branchColor = branchColors[card.data.branch] || "#777";
-
-    // Related files: read selected options from the select
-    const sel = document.getElementById("fRelatedSelect");
-    card.data.relatedFiles = Array.from(sel.selectedOptions).map(opt => ({ url: opt.value, name: opt.textContent }));
-
-    // Re-render card
-    const oldEl = document.getElementById(card.id);
-    if(oldEl) oldEl.remove();
-    makeCardView(card);
-    updateEdges();
-  } else if(selectedType === 'textbox'){
-    const box = textBoxes.find(t => t.id === selected);
-    if(!box) return;
-    box.content = document.getElementById("fDesc").value.trim();
-    const oldEl = document.getElementById(box.id);
-    if(oldEl){
-      const ta = oldEl.querySelector('textarea');
-      if(ta) ta.value = box.content;
-    }
-  }
-  closeEditor();
-  snapshot();
-  render();
-};
-document.getElementById("btnCancel").onclick = closeEditor;
-document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
-
-/* Keyboard shortcuts: Ctrl+Z / Ctrl+Y */
+// Keyboard shortcuts: Ctrl+Z / Ctrl+Y
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
