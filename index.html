@@ -1,3 +1,5 @@
+Below is the complete OrgChart HTML that includes all previous functionality (toolbar, minimap, snapping, editor panel, Firebase sync, anchors/edges, search, undo/redo, zoom/pan) and the new behavior to prevent the profile card editor from opening while editing a text label. The textbox editing flow is isolated, with an editingTextLabel guard and event propagation fixes applied.
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -56,7 +58,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .dead { background:#e53935; }
 .unknown { background:#212121; border:1.5px solid #78909c; }
 .anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20; }
-.anchor.candidate { background:#66bb6a; }
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
   box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
@@ -166,7 +167,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 </div>
 
 <script>
-// Firebase config — replace with your Firebase project config if different.
+// Firebase config — replace if different
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -191,7 +192,8 @@ let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
-let snap = 10; // snapping grid in px
+let snap = 10; // grid snapping in px
+let editingTextLabel = false; // suppress card editor while editing textbox
 
 // DOM
 const viewport = document.getElementById('viewport');
@@ -282,6 +284,12 @@ function makeCardView(card) {
 
   c.addEventListener('click', e => {
     e.stopPropagation();
+    // Prevent opening card editor if a textbox is actively being edited
+    if (editingTextLabel) return;
+    // Ignore clicks that came from a contentEditable element
+    const path = e.composedPath ? e.composedPath() : [];
+    if (path.some(n => n && n.nodeType === 1 && n.isContentEditable)) return;
+
     if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
     selected = card.id; selectedType = 'card'; c.classList.add('selected');
     openEditor(card.id, 'card');
@@ -336,6 +344,12 @@ function makeTextBoxView(box) {
   t.style.minHeight = '50px';
   t.style.width = box.width ? box.width + 'px' : '300px';
 
+  // Prevent event bubbling to stage/card while interacting with text
+  t.addEventListener('pointerdown', e => { e.stopPropagation(); }, true);
+
+  t.addEventListener('focus', () => { editingTextLabel = true; });
+  t.addEventListener('blur', () => { editingTextLabel = false; });
+
   t.addEventListener('click', e => {
     e.stopPropagation();
     if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
@@ -347,7 +361,7 @@ function makeTextBoxView(box) {
   let dragging = false;
   let offset = {x:0,y:0};
   t.addEventListener('pointerdown', e => {
-    dragging = true;
+    // If starting a drag, keep propagation suppressed
     t.classList.add('dragging');
     t.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
@@ -355,7 +369,7 @@ function makeTextBoxView(box) {
     offset.y = wp.y - box.y;
   });
   t.addEventListener('pointermove', e => {
-    if(!dragging) return;
+    if(!(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
     const wp = clientToWorld(e.clientX, e.clientY);
     box.x = snapToGrid(wp.x - offset.x);
     box.y = snapToGrid(wp.y - offset.y);
@@ -364,19 +378,20 @@ function makeTextBoxView(box) {
     renderMinimap();
   });
   t.addEventListener('pointerup', e => {
-    dragging = false;
     t.classList.remove('dragging');
     try { t.releasePointerCapture(e.pointerId); } catch{}
     snapshot();
   });
   t.addEventListener('pointercancel', e => {
-    dragging = false;
     t.classList.remove('dragging');
     try { t.releasePointerCapture(e.pointerId); } catch{}
   });
 
   // Content live update
-  t.addEventListener('input', e => { box.content = t.textContent; });
+  t.addEventListener('input', e => {
+    editingTextLabel = true;
+    box.content = t.textContent;
+  });
 
   cardsLayer.appendChild(t);
   return t;
@@ -502,9 +517,7 @@ function openEditor(id, type){
   } else if(type === "textbox"){
     const box = textBoxes.find(t => t.id === id);
     if(!box) return;
-    // Use description field to edit textbox content for simplicity
     document.getElementById("fDesc").value = box.content || "";
-    // Hide irrelevant fields visually by disabling inputs
   }
 }
 function fillBranchSelect(selectedBranch) {
@@ -549,7 +562,7 @@ function renderFileList(containerId, files){
   cont.appendChild(ul);
 }
 
-// Editor buttons: add external URLs or local files (as object URLs)
+// Editor: URL and local files
 document.getElementById("btnAddRelated").onclick = ()=>{
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fRelatedUrl").value.trim();
@@ -580,7 +593,6 @@ document.getElementById("btnAddOther").onclick = ()=>{
   document.getElementById("fOtherName").value = "";
   snapshot();
 };
-// Local file helpers (object URLs). Replace with Firebase Storage upload if needed.
 function addLocalFileTo(listKey, inputElId){
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const inp = document.getElementById(inputElId);
@@ -611,7 +623,7 @@ document.getElementById("btnUseLocalImage").onclick = ()=>{
   snapshot();
 };
 
-// Save in-editor changes
+// Save/cancel in editor
 document.getElementById("btnSave").onclick = ()=>{
   if(!selected) return;
   if(selectedType === 'card'){
@@ -625,7 +637,6 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.status = document.getElementById("fStatus").value;
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
-    // Re-render only this card
     const oldEl = document.getElementById(card.id);
     if(oldEl) oldEl.remove();
     makeCardView(card);
@@ -701,8 +712,9 @@ document.getElementById("deleteSelectedBtn").onclick = function(){
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
-// Double-click stage to add a card (keep original UX)
+// Double-click stage to add a card (guard when editing text)
 stage.addEventListener("dblclick", e=>{
+  if (editingTextLabel) return;
   if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
   const pos = clientToWorld(e.clientX, e.clientY);
   const newCard = createDefaultCard(pos);
@@ -728,7 +740,7 @@ document.getElementById("searchBox").oninput = function(){
   });
 };
 
-// Zoom with smart focal point, keep snapping consistent
+// Zoom
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
@@ -736,7 +748,6 @@ stage.addEventListener('wheel', e => {
   const oldScale = scale;
   scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
   scale = Math.min(Math.max(scale, 0.25), 4);
-  // keep mouse point fixed
   tx = e.clientX - mousePos.x * scale;
   ty = e.clientY - mousePos.y * scale;
   applyTransform();
@@ -835,14 +846,18 @@ stage.addEventListener('pointerup', e => {
   try{ e.target.releasePointerCapture(e.pointerId); }catch{}
 });
 
-// Deselect on stage click (blank)
+// Deselect on stage click
 stage.addEventListener("click", e=>{
   if(e.target === stage || e.target === viewport){
-    if(selected){ const el = document.getElementById(selected); if(el) el.classList.remove("selected"); selected = null; selectedType = null; closeEditor(); }
+    if(selected){
+      const el = document.getElementById(selected);
+      if(el) el.classList.remove("selected");
+      selected = null; selectedType = null; closeEditor();
+    }
   }
 });
 
-// Minimap render
+// Minimap
 function renderMinimap(){
   minimapSVG.innerHTML = "";
   const sx = 0.08, sy = 0.08;
@@ -866,7 +881,6 @@ function renderMinimap(){
     rect.setAttribute("fill-opacity", "0.7");
     minimapSVG.appendChild(rect);
   });
-  // Optional: viewport rectangle could be computed if you track world extents.
 }
 
 // Live sync + web list
@@ -958,17 +972,15 @@ async function refreshWebList() {
   } catch (e) { console.error("Failed to load Connection Webs list:", e); }
 }
 document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
-document.getElementById("loadWebBtn").onclick = ()=> {
+document.getElementById("loadWebBtn").onclick = ()=>{
   const name = webListDropdown.value || webNameInput.value.trim();
   if(!name) { alert("Pick or type a web name to load"); return; }
   subscribeToWeb(name);
 };
 document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
 
-// Stage blank-click deselect
+// Stage click deselect
 document.addEventListener("DOMContentLoaded", ()=>{ refreshWebList(); });
-
-// Click passthrough
 stage.addEventListener("click", e=>{
   if(e.target === stage){
     if(selected){
@@ -981,5 +993,3 @@ stage.addEventListener("click", e=>{
 </script>
 </body>
 </html>
-
-[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/99374876/b6f0a04b-29a4-4fc2-8ca5-6a349ccb9f18/paste.txt)
