@@ -217,10 +217,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <header>Edit Item</header>
   <label>Profile Picture URL</label>
   <input id="fImage" type="url" placeholder="https://..." />
-  <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
-    <input id="fImageFile" type="file" accept="image/*" />
-    <button id="btnUseLocalImage" type="button">Use File</button>
-  </div>
   <label>Name</label>
   <input id="fName" type="text" />
   <label>Status</label>
@@ -243,8 +239,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <input id="fRelatedName" type="text" placeholder="Display name for hyperlink" />
   <div style="display:flex; gap:8px; margin-top:6px;">
     <button id="btnAddRelated" type="button">Add URL</button>
-    <input id="fRelatedFile" type="file" />
-    <button id="btnAddRelatedFile" type="button">Add File</button>
   </div>
   <div id="relatedList" class="file-list">(none)</div>
 
@@ -253,8 +247,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
   <div style="display:flex; gap:8px; margin-top:6px;">
     <button id="btnAddOther" type="button">Add URL</button>
-    <input id="fOtherFile" type="file" />
-    <button id="btnAddOtherFile" type="button">Add File</button>
   </div>
   <div id="otherList" class="file-list">(none)</div>
 
@@ -805,35 +797,7 @@ document.getElementById("btnAddOther").onclick = ()=>{
   document.getElementById("fOtherName").value = "";
   snapshot();
 };
-function addLocalFileTo(listKey, inputElId){
-  if(!selected || selectedType !== 'card') return alert("No card selected");
-  const inp = document.getElementById(inputElId);
-  if(!inp.files || inp.files.length === 0) return alert("Choose a file");
-  const file = inp.files[0];
-  const url = URL.createObjectURL(file);
-  const name = file.name;
-  const card = cards.find(c=>c.id === selected);
-  if(!card) return;
-  card.data[listKey] = card.data[listKey] || [];
-  card.data[listKey].push({url, name});
-  renderFileList(listKey === 'relatedFiles' ? "relatedList" : "otherList", card.data[listKey]);
-  inp.value = "";
-  snapshot();
-}
-document.getElementById("btnAddRelatedFile").onclick = ()=> addLocalFileTo('relatedFiles','fRelatedFile');
-document.getElementById("btnAddOtherFile").onclick = ()=> addLocalFileTo('otherFiles','fOtherFile');
 
-document.getElementById("btnUseLocalImage").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return alert("No card selected");
-  const f = document.getElementById("fImageFile");
-  if(!f.files || f.files.length===0) return alert("Choose an image");
-  const url = URL.createObjectURL(f.files[0]);
-  document.getElementById("fImage").value = url;
-  const card = cards.find(c=>c.id === selected);
-  if(card){ card.data.image = url; const el = document.getElementById(card.id); if(el){ const img = el.querySelector('.img'); if(img) img.src = url; } }
-  f.value = "";
-  snapshot();
-};
 
 // Save/cancel in editor
 document.getElementById("btnSave").onclick = ()=>{
