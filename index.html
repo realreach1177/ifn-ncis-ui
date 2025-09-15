@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden; }
+html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
 /* Toolbar (merged) */
 #toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
 .toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
@@ -42,7 +42,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 }
 
 .card {
-  position: relative;  /* ✅ required so .anchor can position itself */
+  position: relative;  /* required so .anchor can position itself */
   width: 360px;
   background: #222;
   color: #e0e0e0;
@@ -51,11 +51,8 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  overflow: visible;   /* ✅ so anchor isn't clipped */
+  overflow: visible;   /* so anchor isn't clipped */
 }
-
-
-
 
 .textbox-wrapper {
   background: transparent;
@@ -72,7 +69,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   resize: both;
   overflow: auto;
   font-size: 14px;
-  font-family: system-ui, Segoe UI, Tahoma, Arial;
+  font-family: system-ui, "Segoe UI", Tahoma, Arial;
   width: 300px;
   border: 1px solid #333;
   box-sizing: border-box;
@@ -144,6 +141,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .dead { background: #e53935; }
 .unknown { background: #212121; border: 1.5px solid #78909c; }
 
+/* Anchor (adjustable) */
 .anchor {
   position: absolute;
   width: 16px;
@@ -151,15 +149,12 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #000000;
-  top: -10px;                  /* 👈 now this will actually move it */
+  top: -10px;                  /* float above top of card slightly */
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
   cursor: crosshair;
 }
-
-
-
 
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
@@ -215,30 +210,37 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 <!-- Editor -->
 <div id="editor">
   <header>Edit Item</header>
+
   <label>Profile Picture URL</label>
   <input id="fImage" type="url" placeholder="https://..." />
+
   <label>Name</label>
   <input id="fName" type="text" />
+
   <label>Status</label>
   <select id="fStatus">
     <option>Alive</option>
     <option>Dead</option>
     <option>Unknown</option>
   </select>
+
   <label>Branch</label>
   <select id="fBranch"></select>
+
   <label>Subbranch</label>
   <input id="fSubbranch" type="text" />
+
   <label>Rank</label>
   <select id="fRank"></select>
+
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
 
   <label>Related Files</label>
-<select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;">
-  <!-- Options will be loaded from Firebase (suspects, insurgents, informants) -->
-</select>
-
+  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;">
+    <!-- loaded from firebase: suspects / insurgents / informants -->
+  </select>
+  <div id="relatedList" class="file-list">(none)</div>
 
   <label>Other Files (external URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
@@ -253,10 +255,11 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <button id="btnCancel" type="button">Cancel</button>
   </div>
 </div>
+
 <!-- Custom Confirm Modal -->
 <div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); 
      z-index:1000000; justify-content:center; align-items:center;">
-  <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
+  <div style="background:#222; padding:20px; border-radius:10px; max-width:360px; text-align:center; color:#eee;">
     <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
     <div style="display:flex; justify-content:space-between; gap:10px;">
       <button id="confirmYesBtn" style="flex:1; background:#c62828; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">Yes</button>
@@ -366,68 +369,92 @@ function linkListHTML(files) {
   return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
 }
 
-async function fillRelatedSelect(selected = []) {
- const sel = document.getElementById("fRelatedSelect");
-card.data.relatedFiles = Array.from(sel.selectedOptions).map(opt => ({
-  url: opt.value,
-  name: opt.textContent
-}));
-
-
+/* ---------- Related files select (Firebase) ---------- */
+/*
+  This populates #fRelatedSelect with optgroups pulled from the DB paths:
+  'suspects', 'insurgents', 'informants'.
+  The function also returns the current "selected" file objects for the card.
+*/
+async function populateRelatedFromFirebase(selectedList = []) {
+  const sel = document.getElementById("fRelatedSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
   const paths = ["suspects", "insurgents", "informants"];
   for (let path of paths) {
-    const snap = await get(child(ref(db), path));
-    if (snap.exists()) {
-      const group = document.createElement("optgroup");
-      group.label = path;
-      Object.values(snap.val()).forEach(file=>{
-        const opt = document.createElement("option");
-        opt.value = file.url;
-        opt.textContent = file.name || fileNameFromUrl(file.url);
-        if (selected.some(s => s.url === opt.value)) {
+    try {
+      const snap = await db.ref(path).once('value');
+      if (!snap || !snap.exists()) continue;
+      const data = snap.val();
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = path;
+      // data may be keyed objects; iterate values
+      Object.keys(data).forEach(k => {
+        const file = data[k];
+        const opt = document.createElement('option');
+        // support file shaped as { url, name } or plain string url
+        const url = (typeof file === 'object' && file.url) ? file.url : (typeof file === 'string' ? file : '');
+        const name = (typeof file === 'object' && file.name) ? file.name : fileNameFromUrl(url);
+        opt.value = url;
+        opt.textContent = name;
+        // mark selected if selectedList contains this url
+        if (Array.isArray(selectedList) && selectedList.some(s => s && (s.url || s) === url)) {
           opt.selected = true;
         }
-        group.appendChild(opt);
+        optgroup.appendChild(opt);
       });
-      sel.appendChild(group);
+      sel.appendChild(optgroup);
+    } catch (err) {
+      console.warn("Failed to load", path, err);
     }
   }
+  // Also update relatedList visible links (if card had selections)
+  updateRelatedListFromSelect();
+}
+
+function updateRelatedListFromSelect() {
+  const sel = document.getElementById("fRelatedSelect");
+  const out = document.getElementById("relatedList");
+  if(!sel || !out) return;
+  const selected = Array.from(sel.selectedOptions).map(opt => ({ url: opt.value, name: opt.textContent }));
+  if (selected.length === 0) { out.textContent = "(none)"; return; }
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 0';
+  ul.style.paddingLeft = '18px';
+  selected.forEach(s => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = s.url;
+    a.textContent = s.name || fileNameFromUrl(s.url);
+    a.target = "_blank";
+    a.rel = "noopener";
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+  out.innerHTML = "";
+  out.appendChild(ul);
 }
 
 /* ---------- Edge drawing & anchor positioning ---------- */
 /* Return anchor center in WORLD coordinates (i.e., the coordinate space used for SVG lines)
-   NOTE: replaced DOM-measurement approach with model-based computation so lines don't split
-   when zooming/panning. Cards are stored in 'cards' with x,y being world coords (top-left). */
+   We measure the anchor DOM element (screen coords) and convert to the "world" coordinate
+   system used by the SVG lines (because the viewport is transformed via CSS).
+*/
 function anchorCenter(cardId) {
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
-
-  // find the actual anchor dot
   const anchorEl = cardEl.querySelector('.anchor');
   if (!anchorEl) return null;
-
-  // bounding boxes
   const rectAnchor = anchorEl.getBoundingClientRect();
   const rectViewport = viewport.getBoundingClientRect();
-
-  // center of the anchor dot (in screen coords)
   const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
   const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
-
-  // convert to world coords
-  return {
-    x: (ax - tx) / scale,
-    y: (ay - ty) / scale
-  };
+  return { x: (ax - tx) / scale, y: (ay - ty) / scale };
 }
-
-
 
 function updateEdges() {
   // Clear existing
   while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
   edges.forEach(edge => {
-    // Support both legacy and current edge shapes
     const aId = edge.a ? edge.a.card : (edge.from || null);
     const bId = edge.b ? edge.b.card : (edge.to || null);
     const aCard = cards.find(c => c.id === aId);
@@ -437,15 +464,14 @@ function updateEdges() {
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    // set coordinates in WORLD space — viewport is transformed with CSS scale/translate
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
     line.setAttribute("y2", posB.y);
-    line.setAttribute("stroke", "#b0aeae");
+    line.setAttribute("stroke", "#ffffff"); // white lines per request
     line.setAttribute("stroke-width", "4");
     line.setAttribute("stroke-linecap", "round");
-    line.setAttribute("opacity", "0.9");
+    line.setAttribute("opacity", "0.95");
     wiresLayer.appendChild(line);
   });
 }
@@ -464,7 +490,7 @@ function makeCardView(card) {
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
   c.innerHTML = `
-    <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
+    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
       <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
       <div class="rank">${d.rank || ''}</div>
@@ -483,6 +509,7 @@ function makeCardView(card) {
     if (editingTextLabel) return;
     if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
     selected = card.id; selectedType = 'card'; c.classList.add('selected');
+    // openEditor is async but it's ok we don't await it here
     openEditor(card.id, 'card');
   });
 
@@ -598,7 +625,6 @@ function makeTextBoxView(box) {
   // Observe size changes (native resize) to keep model in sync
   const ro = new ResizeObserver(entries => {
     for(const ent of entries) {
-      // ent.contentRect.width/height are in CSS px of the textarea
       const w = Math.round(ent.contentRect.width);
       const h = Math.round(ent.contentRect.height);
       box.width = w;
@@ -646,6 +672,7 @@ function snapshot() {
 }
 
 function loadState(state) {
+  if (!state) return;
   cards.splice(0, cards.length, ...(state.cards || []));
   edges.splice(0, edges.length, ...(state.edges || []));
   textBoxes.splice(0, textBoxes.length, ...(state.textBoxes || []));
@@ -653,9 +680,8 @@ function loadState(state) {
   ty = state.ty || 0;
   scale = state.scale || 1;
   applyTransform();
-  render();   // ✅ re-render DOM after restoring state
+  render();   // re-render DOM after restoring state
 }
-
 
 function undo() {
   if (undoStack.length === 0) { toast("Nothing to undo"); return; }
@@ -668,7 +694,6 @@ function undo() {
   } catch (e) { console.error(e); }
 }
 
-
 function redo() {
   if (redoStack.length === 0) { toast("Nothing to redo"); return; }
   try {
@@ -680,27 +705,26 @@ function redo() {
   } catch (e) { console.error(e); }
 }
 
-
 /* ---------- Selection / Editor ---------- */
 function deselect() {
   if (selected) {
     let el = document.getElementById(selected);
     if (el) el.classList.remove("selected");
-    selected = null; 
+    selected = null;
     selectedType = null;
   }
   closeEditor();
 }
-
-function closeEditor() { 
-  document.getElementById("editor").style.display = "none"; 
+function closeEditor() {
+  document.getElementById("editor").style.display = "none";
 }
 
 async function openEditor(id, type) {
+  // Ensure editor visible
   let ed = document.getElementById("editor");
   ed.style.display = "block";
 
-  // Reset all fields
+  // Reset fields that exist
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
@@ -708,24 +732,24 @@ async function openEditor(id, type) {
   document.getElementById("fSubbranch").value = "";
   document.getElementById("fStatus").value = "Unknown";
   document.getElementById("fDesc").value = "";
-
-  // Get the card if type=card
-  const card = (type === "card") ? cards.find(c => c.id === id) : null;
-
-  // Populate related files select from Firebase
-  await fillRelatedSelect(card ? card.data.relatedFiles : []);
-
-  // Reset other fields
-  document.getElementById("otherList").innerHTML = "(none)";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
-  document.getElementById("fImageFile").value = "";
-  document.getElementById("fOtherFile").value = "";
+  document.getElementById("otherList").innerHTML = "(none)";
+  // clear visible related list until populate finishes
+  document.getElementById("relatedList").innerHTML = "(none)";
 
-  selected = id; 
+  // Determine card if applicable
+  const card = (type === "card") ? cards.find(c => c.id === id) : null;
+  selected = id;
   selectedType = type;
 
+  // Populate related select with firebase options (and mark selected from card)
+  await populateRelatedFromFirebase(card ? (card.data.relatedFiles || []) : []);
+
+  // Show/hide fields depending on type
   if (type === "card" && card) {
+    // show all editor controls
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
     document.getElementById("fImage").value = card.data.image || "";
     document.getElementById("fName").value = card.data.name || "";
     fillBranchSelect(card.data.branch);
@@ -733,25 +757,26 @@ async function openEditor(id, type) {
     document.getElementById("fSubbranch").value = card.data.subbranch || "";
     document.getElementById("fStatus").value = card.data.status || "Unknown";
     document.getElementById("fDesc").value = card.data.desc || "";
-    // Related files handled by fillRelatedSelect
+    // Render other files and selected relatedList
     renderFileList("otherList", card.data.otherFiles);
-  } 
-  else if (type === "textbox") {
-    // Hide everything except description
+    updateRelatedListFromSelect(); // reflect the select's selected options in the visible list area
+  } else if (type === "textbox") {
+    // hide everything except header + short description label + textarea
     document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
     document.querySelector("#editor header").style.display = "block";
-
-    const descLabel = Array.from(document.querySelectorAll("#editor label"))
-      .find(l => l.textContent.includes("Short Description"));
+    // find short description label + show it
+    const descLabel = Array.from(document.querySelectorAll("#editor label")).find(l => l.textContent.includes("Short Description"));
     if (descLabel) descLabel.style.display = "block";
-
     document.getElementById("fDesc").style.display = "block";
-
     const box = textBoxes.find(t => t.id === id);
     if (box) document.getElementById("fDesc").value = box.content || "";
   }
 }
 
+// Ensure select changes update visible related list
+document.getElementById("fRelatedSelect").addEventListener('change', updateRelatedListFromSelect);
+
+/* Editor helpers */
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
@@ -762,7 +787,6 @@ function fillBranchSelect(selectedBranch) {
     sel.appendChild(opt);
   });
 }
-
 function fillRankSelect(branch, selectedRank) {
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
@@ -772,8 +796,6 @@ function fillRankSelect(branch, selectedRank) {
     if (r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
-}
-
 }
 function renderFileList(containerId, files) {
   const cont = document.getElementById(containerId);
@@ -797,29 +819,13 @@ function renderFileList(containerId, files) {
   cont.appendChild(ul);
 }
 
-
-// Editor: URL and local files handlers
-document.getElementById("btnAddRelated").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return alert("No card selected");
-  const url = document.getElementById("fRelatedUrl").value.trim();
-  const name = document.getElementById("fRelatedName").value.trim() || fileNameFromUrl(url);
-  if(!url) return alert("Please enter a URL");
-  const card = cards.find(c=>c.id === selected);
-  if(!card) return;
-  card.data.relatedFiles = card.data.relatedFiles || [];
-  if(!card.data.relatedFiles.some(f=>f.url === url)) {
-    card.data.relatedFiles.push({url, name});
-    renderFileList("relatedList", card.data.relatedFiles);
-    document.getElementById("fRelatedUrl").value = "";
-    document.getElementById("fRelatedName").value = "";
-    snapshot();
-  }
-};
+/* ---------- Editor button handlers ---------- */
+// Add other (external URL)
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return alert("No card selected");
+  if(!selected || selectedType !== 'card') { toast("Select a card first"); return; }
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if(!url) return alert("Please enter a URL");
+  if(!url) { alert("Please enter a URL"); return; }
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
@@ -829,7 +835,6 @@ document.getElementById("btnAddOther").onclick = ()=>{
   document.getElementById("fOtherName").value = "";
   snapshot();
 };
-
 
 // Save/cancel in editor
 document.getElementById("btnSave").onclick = ()=>{
@@ -845,6 +850,14 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.status = document.getElementById("fStatus").value;
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
+
+    // Collect related files from select
+    const sel = document.getElementById("fRelatedSelect");
+    if (sel) {
+      const selectedFiles = Array.from(sel.selectedOptions).map(opt => ({ url: opt.value, name: opt.textContent }));
+      card.data.relatedFiles = selectedFiles;
+    }
+
     // Re-render card
     const oldEl = document.getElementById(card.id);
     if(oldEl) oldEl.remove();
@@ -916,7 +929,7 @@ document.getElementById("deleteSelectedBtn").onclick = async function(){
 
   if(selectedType === "card"){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
-    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
+    edges = edges.filter(e => !( (e.a && e.a.card === selected) || (e.b && e.b.card === selected) ));
   } else if(selectedType === "textbox"){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
   }
@@ -1069,7 +1082,6 @@ stage.addEventListener('pointerdown', e => {
 stage.addEventListener('pointermove', e => {
   if (!anchorDrag.active) return;
   const pos = clientToWorld(e.clientX, e.clientY);
-
   const startPos = anchorCenter(anchorDrag.startCardId);
   if (anchorDrag.tmpLine && startPos) {
     anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -1101,8 +1113,8 @@ stage.addEventListener('pointerup', e => {
 
   // Prevent duplicate edges
   if (!edges.some(edge =>
-    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
-    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
+    (edge.a && edge.a.card === anchorDrag.startCardId && edge.b && edge.b.card === targetCard) ||
+    (edge.a && edge.a.card === targetCard && edge.b && edge.b.card === anchorDrag.startCardId)
   )) {
     const newEdge = {
       id: "e" + Math.random().toString(36).slice(2,9),
@@ -1122,7 +1134,6 @@ stage.addEventListener('pointerup', e => {
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
 
-
 /* ---------- Deselect on stage click ---------- */
 stage.addEventListener("click", e=>{
   if(e.target === stage || e.target === viewport){
@@ -1140,10 +1151,8 @@ const webListDropdown = document.getElementById('webListDropdown');
 let currentWebListener = null;
 
 async function subscribeToWeb(name) {
-  if (currentWebListener) {
-    if(webListDropdown.value) {
-      db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
-    }
+  if (currentWebListener && webListDropdown.value) {
+    db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
     currentWebListener = null;
   }
   if(!name) return;
@@ -1199,8 +1208,8 @@ async function saveCurrentWeb() {
 async function deleteCurrentWeb() {
   const name = webListDropdown.value;
   if (!name) { alert("Select a Connection Web to delete"); return; }
-  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
-  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
+  const confirmed = await customConfirm(`Delete Connection Web "${name}"? This action cannot be undone.`);
+  if (!confirmed) return;
   try {
     if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
     await db.ref(`connectionWebs/${name}`).remove();
@@ -1241,12 +1250,17 @@ document.addEventListener("click", (e) => {
 }, false);
 
 // Initialize
-document.addEventListener("DOMContentLoaded", ()=>{
-  refreshWebList();
+document.addEventListener("DOMContentLoaded", async ()=>{
+  await refreshWebList();
+  // Populate branch/rank picks
+  fillBranchSelect("None");
+  fillRankSelect("None", "None");
   render();
   // initial snapshot
   snapshot();
 });
+
+// Custom confirm modal
 function customConfirm(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirmModal");
@@ -1273,6 +1287,10 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
 });
+
+// keep related-list updated if user manually interacts with select using keyboard, etc.
+document.getElementById("fRelatedSelect").addEventListener('keyup', updateRelatedListFromSelect);
+
 </script>
 </body>
 </html>
