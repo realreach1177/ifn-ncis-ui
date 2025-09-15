@@ -76,9 +76,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 /* Toasts */
 .toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
   box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
-/* Minimap */
-#minimap { position:absolute; right:12px; bottom:12px; width:220px; height:150px; background:#1a1a1a; border:2px solid #444; border-radius:8px; overflow:hidden; z-index:5000; }
-#minimapSVG { width:100%; height:100%; }
 </style>
 </head>
 <body>
@@ -107,8 +104,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <div id="cards"></div>
   </div>
 </div>
-<!-- Minimap -->
-<div id="minimap"><svg id="minimapSVG"></svg></div>
 <!-- Editor -->
 <div id="editor">
   <header>Edit Item</header>
@@ -187,15 +182,58 @@ let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
-let snap = 10; // grid snapping in px
-let editingTextLabel = false; // suppress card editor while editing textbox
+let snap = 10;
+let editingTextLabel = false;
 
-// DOM references
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
 const cardsLayer = document.getElementById('cards');
 const wiresLayer = document.getElementById('wires');
-const minimapSVG = document.getElementById('minimapSVG');
+
+function updateEdges() {
+  wiresLayer.innerHTML = '';
+  edges.forEach(edge => {
+    const a = cards.find(c => c.id === edge.a.card);
+    const b = cards.find(c => c.id === edge.b.card);
+    if (!a || !b) return;
+    // Find the DOM elements
+    const elA = document.getElementById(a.id);
+    const elB = document.getElementById(b.id);
+    if (!elA || !elB) return;
+    const rectA = elA.getBoundingClientRect();
+    const rectB = elB.getBoundingClientRect();
+    const rectViewport = viewport.getBoundingClientRect();
+    // Calculate center positions relative to the viewport
+    const ax = (rectA.left + rectA.right) / 2 - rectViewport.left;
+    const ay = (rectA.top + rectA.bottom) / 2 - rectViewport.top;
+    const bx = (rectB.left + rectB.right) / 2 - rectViewport.left;
+    const by = (rectB.top + rectB.bottom) / 2 - rectViewport.top;
+    // Adjust for transform (scale, tx, ty)
+    const invScale = 1 / scale;
+    const offsetX = tx;
+    const offsetY = ty;
+    const svgX1 = (ax - offsetX) * invScale;
+    const svgY1 = (ay - offsetY) * invScale;
+    const svgX2 = (bx - offsetX) * invScale;
+    const svgY2 = (by - offsetY) * invScale;
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", svgX1);
+    line.setAttribute("y1", svgY1);
+    line.setAttribute("x2", svgX2);
+    line.setAttribute("y2", svgY2);
+    line.setAttribute("stroke", "#ffd54f");
+    line.setAttribute("stroke-width", "4");
+    line.setAttribute("opacity", "0.8");
+    wiresLayer.appendChild(line);
+  });
+}
+
+function render() {
+  cardsLayer.innerHTML = '';
+  cards.forEach(makeCardView);
+  textBoxes.forEach(makeTextBoxView);
+  updateEdges();
+}
 
 const branchColors = {
   "None": "#777777",
@@ -232,7 +270,6 @@ const rankLists = {
   ]
 };
 
-// Utilities
 function contrast(hex) {
   hex = (hex || '').replace('#', '');
   if (hex.length !== 6) return '#000';
@@ -261,10 +298,10 @@ function clientToWorld(cx, cy){
 }
 function snapToGrid(v){ return Math.round(v / snap) * snap; }
 
-// --- RENDERERS ---
 function linkListHTML(files) {
   return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
 }
+
 function makeCardView(card) {
   const c = document.createElement('div');
   c.className = 'card';
@@ -275,7 +312,6 @@ function makeCardView(card) {
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
-
   c.innerHTML = `
     <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
@@ -290,18 +326,15 @@ function makeCardView(card) {
     </div>
     <div class="anchor" title="Drag to link"></div>
   `;
-
   c.addEventListener('click', e => {
     e.stopPropagation();
-    if (editingTextLabel) return;
+    if (editingTextLabel || (document.activeElement && document.activeElement.isContentEditable)) return;
     const path = e.composedPath ? e.composedPath() : [];
     if (path.some(n => n && n.nodeType === 1 && n.isContentEditable)) return;
-
     if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
     selected = card.id; selectedType = 'card'; c.classList.add('selected');
     openEditor(card.id, 'card');
   });
-
   // Dragging for cards
   let dragging = false;
   let offset = {x:0,y:0};
@@ -322,7 +355,6 @@ function makeCardView(card) {
     c.style.left = card.x + 'px';
     c.style.top = card.y + 'px';
     updateEdges();
-    renderMinimap();
   });
   c.addEventListener('pointerup', e => {
     dragging = false;
@@ -335,9 +367,119 @@ function makeCardView(card) {
     c.classList.remove('dragging');
     try { c.releasePointerCapture(e.pointerId); } catch{}
   });
-
   cardsLayer.appendChild(c);
   return c;
+}
+
+function makeTextBoxView(box) {
+  const t = document.createElement('div');
+  t.className = 'textbox';
+  t.id = box.id;
+  t.style.left = box.x + 'px';
+  t.style.top = box.y + 'px';
+  t.textContent = box.content || "";
+  t.contentEditable = true;
+  t.spellcheck = false;
+  t.style.minHeight = '50px';
+  t.style.width = box.width ? box.width + 'px' : '300px';
+
+  // Resizing support (native), adjust box.width on resize and keep cursor in sync
+  let lastWidth = box.width || 300;
+
+  // Drag/resize state
+  let dragging = false;
+  let resizing = false;
+  let offset = { x: 0, y: 0 };
+
+  // Mouse down: check for resize
+  t.addEventListener('mousedown', e => {
+    if (e.target === t && (e.offsetX >= t.offsetWidth - 16 && e.offsetY >= t.offsetHeight - 16)) {
+      resizing = true;
+      lastWidth = t.offsetWidth;
+      e.preventDefault();
+    }
+  });
+
+  // Mouse move: resizing
+  t.addEventListener('mousemove', e => {
+    if (resizing) {
+      const minWidth = 100;
+      const newWidth = Math.max(minWidth, e.offsetX);
+      t.style.width = newWidth + 'px';
+      box.width = newWidth;
+    }
+  });
+
+  // Mouse up: end resize
+  t.addEventListener('mouseup', e => {
+    if (resizing) {
+      resizing = false;
+      snapshot();
+    }
+  });
+
+  // Pointer down: drag
+  t.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    // Only drag if not resizing and not focused for editing
+    if (!resizing && document.activeElement !== t) {
+      dragging = true;
+      t.classList.add('dragging');
+      t.setPointerCapture(e.pointerId);
+      const wp = clientToWorld(e.clientX, e.clientY);
+      offset.x = wp.x - box.x;
+      offset.y = wp.y - box.y;
+    }
+  });
+
+  t.addEventListener('pointermove', e => {
+    if(!dragging || !(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    box.x = snapToGrid(wp.x - offset.x);
+    box.y = snapToGrid(wp.y - offset.y);
+    t.style.left = box.x + 'px';
+    t.style.top = box.y + 'px';
+    updateEdges();
+  });
+
+  t.addEventListener('pointerup', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    try { t.releasePointerCapture(e.pointerId); } catch {}
+    snapshot();
+  });
+
+  t.addEventListener('pointercancel', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    try { t.releasePointerCapture(e.pointerId); } catch {}
+  });
+
+  t.addEventListener('input', e => {
+    editingTextLabel = true;
+    box.content = t.textContent;
+  });
+
+  t.addEventListener('focus', e => { editingTextLabel = true; });
+  t.addEventListener('blur', e => { editingTextLabel = false; });
+
+  t.addEventListener('click', e => {
+    e.stopPropagation();
+    // Only select textbox and open editor if not editing text
+    if (document.activeElement !== t) {
+      if(selected){ 
+        const prev = document.getElementById(selected); 
+        if(prev) prev.classList.remove('selected'); 
+      }
+      selected = box.id;
+      selectedType = 'textbox';
+      t.classList.add('selected');
+      openEditor(box.id, 'textbox');
+    }
+  });
+
+  cardsLayer.appendChild(t);
+  return t;
 }
 
 // --- Only one renderMinimap function, at top level
