@@ -1042,22 +1042,22 @@ stage.addEventListener('pointercancel', e => {
 
 /* ---------- Anchor linking (create edges) ---------- */
 let anchorDrag = { active:false, startCardId:null, tmpLine:null };
+
 stage.addEventListener('pointerdown', e => {
-  // Start anchor drag when user presses on an anchor
   if (e.target.classList.contains('anchor')) {
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
+
     anchorDrag.active = true;
     anchorDrag.startCardId = cardEl.id;
 
     const svgNS = "http://www.w3.org/2000/svg";
     anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
-    anchorDrag.tmpLine.setAttribute('stroke', '#ffd54f');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff'); // white line
     anchorDrag.tmpLine.setAttribute('stroke-width', '3');
     anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(anchorDrag.tmpLine);
 
-    // Use model-based anchor center
     const startPos = anchorCenter(anchorDrag.startCardId);
     if (startPos) {
       anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -1065,6 +1065,7 @@ stage.addEventListener('pointerdown', e => {
       anchorDrag.tmpLine.setAttribute('x2', startPos.x);
       anchorDrag.tmpLine.setAttribute('y2', startPos.y);
     }
+
     try { e.target.setPointerCapture(e.pointerId); } catch {}
   }
 });
@@ -1072,15 +1073,13 @@ stage.addEventListener('pointerdown', e => {
 stage.addEventListener('pointermove', e => {
   if (!anchorDrag.active) return;
   const pos = clientToWorld(e.clientX, e.clientY);
-  if (anchorDrag.tmpLine) {
+
+  const startPos = anchorCenter(anchorDrag.startCardId);
+  if (anchorDrag.tmpLine && startPos) {
+    anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+    anchorDrag.tmpLine.setAttribute('y1', startPos.y);
     anchorDrag.tmpLine.setAttribute('x2', pos.x);
     anchorDrag.tmpLine.setAttribute('y2', pos.y);
-    // keep x1,y1 synced with model start (in case the start card moves)
-    const startPos = anchorCenter(anchorDrag.startCardId);
-    if (startPos) {
-      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
-      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
-    }
   }
 });
 
@@ -1090,9 +1089,9 @@ stage.addEventListener('pointerup', e => {
 
   let targetCard = null;
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  if(el) {
+  if (el) {
     const cardEl = el.closest('.card');
-    if(cardEl) targetCard = cardEl.id;
+    if (cardEl) targetCard = cardEl.id;
   }
 
   if (!targetCard || targetCard === anchorDrag.startCardId) {
@@ -1104,14 +1103,11 @@ stage.addEventListener('pointerup', e => {
     return;
   }
 
-  // Prevent duplicate edges (support saved shape)
-  const exists = edges.some(edge=>{
-    const aId = edge.a ? edge.a.card : (edge.from || null);
-    const bId = edge.b ? edge.b.card : (edge.to || null);
-    return (aId === anchorDrag.startCardId && bId === targetCard) || (aId === targetCard && bId === anchorDrag.startCardId);
-  });
-
-  if (!exists) {
+  // Prevent duplicate edges
+  if (!edges.some(edge =>
+    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
+    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
+  )) {
     const newEdge = {
       id: "e" + Math.random().toString(36).slice(2,9),
       a: { card: anchorDrag.startCardId },
@@ -1129,6 +1125,7 @@ stage.addEventListener('pointerup', e => {
   }
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
+
 
 /* ---------- Deselect on stage click ---------- */
 stage.addEventListener("click", e=>{
