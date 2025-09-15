@@ -1,5 +1,3 @@
-Below is the complete OrgChart HTML that includes all previous functionality (toolbar, minimap, snapping, editor panel, Firebase sync, anchors/edges, search, undo/redo, zoom/pan) and the new behavior to prevent the profile card editor from opening while editing a text label. The textbox editing flow is isolated, with an editingTextLabel guard and event propagation fixes applied.
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -102,7 +100,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
   </div>
 </div>
-
 <!-- Stage -->
 <div id="stage">
   <div id="viewport">
@@ -110,10 +107,8 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <div id="cards"></div>
   </div>
 </div>
-
 <!-- Minimap -->
 <div id="minimap"><svg id="minimapSVG"></svg></div>
-
 <!-- Editor -->
 <div id="editor">
   <header>Edit Item</header>
@@ -167,13 +162,13 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 </div>
 
 <script>
-// Firebase config — replace if different
+// Firebase config - replace if different
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
   databaseURL: "https://ncis-intranet-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: "ncis-intranet",
-  storageBucket: "ncis-intranet.firebasestorage.app",
+  storageBucket: "ncis-intranet.appspot.com",
   messagingSenderId: "1010993365309",
   appId: "1:1010993365309:c72db8c5d95c061adc554",
   measurementId: "G-GLMXRGGSHX"
@@ -195,7 +190,7 @@ let redoStack = [];
 let snap = 10; // grid snapping in px
 let editingTextLabel = false; // suppress card editor while editing textbox
 
-// DOM
+// DOM references
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
 const cardsLayer = document.getElementById('cards');
@@ -223,7 +218,7 @@ const rankLists = {
   "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"]
 };
 
-// Helpers
+// Utilities
 function contrast(hex) {
   hex = (hex || '').replace('#', '');
   if (hex.length !== 6) return '#000';
@@ -284,9 +279,8 @@ function makeCardView(card) {
 
   c.addEventListener('click', e => {
     e.stopPropagation();
-    // Prevent opening card editor if a textbox is actively being edited
     if (editingTextLabel) return;
-    // Ignore clicks that came from a contentEditable element
+    // Prevent clicks from contentEditable elements
     const path = e.composedPath ? e.composedPath() : [];
     if (path.some(n => n && n.nodeType === 1 && n.isContentEditable)) return;
 
@@ -295,7 +289,7 @@ function makeCardView(card) {
     openEditor(card.id, 'card');
   });
 
-  // Dragging
+  // Dragging for cards
   let dragging = false;
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
@@ -332,6 +326,7 @@ function makeCardView(card) {
   cardsLayer.appendChild(c);
   return c;
 }
+
 function makeTextBoxView(box) {
   const t = document.createElement('div');
   t.className = 'textbox';
@@ -345,10 +340,96 @@ function makeTextBoxView(box) {
   t.style.width = box.width ? box.width + 'px' : '300px';
 
   // Prevent event bubbling to stage/card while interacting with text
-  t.addEventListener('pointerdown', e => { e.stopPropagation(); }, true);
+  t.addEventListener('pointerdown', e => {
+    e.stopPropagation(); // *** Important: Stop propagation so drag does not affect cards or stage ***
+    dragging = true;
+    t.classList.add('dragging');
+    t.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - box.x;
+    offset.y = wp.y - box.y;
+  });
+  t.addEventListener('pointermove', e => {
+    if(!dragging || !(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    box.x = snapToGrid(wp.x - offset.x);
+    box.y = snapToGrid(wp.y - offset.y);
+    t.style.left = box.x + 'px';
+    t.style.top = box.y + 'px';
+   function renderMinimap(){
+  minimapSVG.innerHTML = "";
+  const minimapWidth = 220;
+  const minimapHeight = 150;
+  
+  // Calculate bounding box of all elements
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  cards.forEach(c => {
+    minX = Math.min(minX, c.x);
+    minY = Math.min(minY, c.y);
+    maxX = Math.max(maxX, c.x + 360); // card width
+    maxY = Math.max(maxY, c.y + 120); // card height
+  });
+  textBoxes.forEach(t => {
+    minX = Math.min(minX, t.x);
+    minY = Math.min(minY, t.y);
+    maxX = Math.max(maxX, t.x + (t.width || 300));
+    maxY = Math.max(maxY, t.y + 60);
+  });
 
-  t.addEventListener('focus', () => { editingTextLabel = true; });
-  t.addEventListener('blur', () => { editingTextLabel = false; });
+  // Fallback if no items to avoid infinity
+  if (minX === Infinity) {
+    minX = 0; minY = 0; maxX = 1000; maxY = 800;
+  }
+
+  const workspaceWidth = maxX - minX;
+  const workspaceHeight = maxY - minY;
+
+  // Scale to fit all inside minimap box keeping aspect ratio
+  const scaleX = minimapWidth / workspaceWidth;
+  const scaleY = minimapHeight / workspaceHeight;
+  const scale = Math.min(scaleX, scaleY);
+
+  cards.forEach(c => {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", (c.x - minX) * scale);
+    rect.setAttribute("y", (c.y - minY) * scale);
+    rect.setAttribute("width", 360 * scale);
+    rect.setAttribute("height", 120 * scale);
+    rect.setAttribute("fill", (c.data.branchColor||"#777"));
+    rect.setAttribute("fill-opacity", "0.9");
+    minimapSVG.appendChild(rect);
+  });
+  textBoxes.forEach(t => {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", (t.x - minX) * scale);
+    rect.setAttribute("y", (t.y - minY) * scale);
+    rect.setAttribute("width", (t.width || 300) * scale);
+    rect.setAttribute("height", 60 * scale);
+    rect.setAttribute("fill", "#999");
+    rect.setAttribute("fill-opacity", "0.7");
+    minimapSVG.appendChild(rect);
+  });
+}
+
+  t.addEventListener('pointerup', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    try { t.releasePointerCapture(e.pointerId); } catch{}
+    snapshot();
+  });
+  t.addEventListener('pointercancel', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    try { t.releasePointerCapture(e.pointerId); } catch{}
+  });
+
+  t.addEventListener('input', e => {
+    editingTextLabel = true;
+    box.content = t.textContent;
+  });
+
+  t.addEventListener('focus', e => { editingTextLabel = true; });
+  t.addEventListener('blur', e => { editingTextLabel = false; });
 
   t.addEventListener('click', e => {
     e.stopPropagation();
@@ -357,45 +438,14 @@ function makeTextBoxView(box) {
     openEditor(box.id, 'textbox');
   });
 
-  // Dragging
+  // Define dragging state variables for textboxes separately
   let dragging = false;
   let offset = {x:0,y:0};
-  t.addEventListener('pointerdown', e => {
-    // If starting a drag, keep propagation suppressed
-    t.classList.add('dragging');
-    t.setPointerCapture(e.pointerId);
-    const wp = clientToWorld(e.clientX, e.clientY);
-    offset.x = wp.x - box.x;
-    offset.y = wp.y - box.y;
-  });
-  t.addEventListener('pointermove', e => {
-    if(!(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
-    const wp = clientToWorld(e.clientX, e.clientY);
-    box.x = snapToGrid(wp.x - offset.x);
-    box.y = snapToGrid(wp.y - offset.y);
-    t.style.left = box.x + 'px';
-    t.style.top = box.y + 'px';
-    renderMinimap();
-  });
-  t.addEventListener('pointerup', e => {
-    t.classList.remove('dragging');
-    try { t.releasePointerCapture(e.pointerId); } catch{}
-    snapshot();
-  });
-  t.addEventListener('pointercancel', e => {
-    t.classList.remove('dragging');
-    try { t.releasePointerCapture(e.pointerId); } catch{}
-  });
-
-  // Content live update
-  t.addEventListener('input', e => {
-    editingTextLabel = true;
-    box.content = t.textContent;
-  });
 
   cardsLayer.appendChild(t);
   return t;
 }
+
 function makeEdgeView(edge) {
   const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
   ln.setAttribute("stroke", "#fff");
@@ -405,6 +455,7 @@ function makeEdgeView(edge) {
   wiresLayer.appendChild(ln);
   return ln;
 }
+
 function anchorCenter(cardId) {
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
@@ -426,6 +477,7 @@ function updateEdge(edge) {
   line.setAttribute("y2", end.y);
 }
 function updateEdges() { edges.forEach(updateEdge); }
+
 function render() {
   cardsLayer.innerHTML = '';
   wiresLayer.innerHTML = '';
@@ -437,12 +489,14 @@ function render() {
   renderMinimap();
 }
 
-// History
+// Snapshots and undo/redo store/load
+
 function snapshot() {
   undoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
   if (undoStack.length > 100) undoStack.shift();
   redoStack = [];
 }
+
 function undo() {
   if(undoStack.length === 0){ alert("Nothing to undo"); return; }
   redoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
@@ -451,6 +505,7 @@ function undo() {
   render();
   toast("Undo");
 }
+
 function redo() {
   if(redoStack.length === 0){ alert("Nothing to redo"); return; }
   undoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
@@ -459,6 +514,7 @@ function redo() {
   render();
   toast("Redo");
 }
+
 function loadState(state) {
   cards.splice(0, cards.length, ...(state.cards || []));
   edges.splice(0, edges.length, ...(state.edges || []));
@@ -478,7 +534,9 @@ function deselect() {
   }
   closeEditor();
 }
+
 function closeEditor() { document.getElementById("editor").style.display = "none"; }
+
 function openEditor(id, type){
   let ed = document.getElementById("editor");
   ed.style.display = "block";
@@ -520,6 +578,7 @@ function openEditor(id, type){
     document.getElementById("fDesc").value = box.content || "";
   }
 }
+
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
@@ -530,6 +589,7 @@ function fillBranchSelect(selectedBranch) {
     sel.appendChild(opt);
   });
 }
+
 function fillRankSelect(branch, selectedRank){
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
@@ -540,6 +600,7 @@ function fillRankSelect(branch, selectedRank){
     sel.appendChild(opt);
   });
 }
+
 function renderFileList(containerId, files){
   const cont = document.getElementById(containerId);
   cont.innerHTML = "";
@@ -562,7 +623,7 @@ function renderFileList(containerId, files){
   cont.appendChild(ul);
 }
 
-// Editor: URL and local files
+// Editor: URL and local files handlers
 document.getElementById("btnAddRelated").onclick = ()=>{
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fRelatedUrl").value.trim();
@@ -597,7 +658,7 @@ function addLocalFileTo(listKey, inputElId){
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const inp = document.getElementById(inputElId);
   if(!inp.files || inp.files.length === 0) return alert("Choose a file");
-  const file = inp.files;
+  const file = inp.files[0];
   const url = URL.createObjectURL(file);
   const name = file.name;
   const card = cards.find(c=>c.id === selected);
@@ -615,7 +676,7 @@ document.getElementById("btnUseLocalImage").onclick = ()=>{
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const f = document.getElementById("fImageFile");
   if(!f.files || f.files.length===0) return alert("Choose an image");
-  const url = URL.createObjectURL(f.files);
+  const url = URL.createObjectURL(f.files[0]);
   document.getElementById("fImage").value = url;
   const card = cards.find(c=>c.id === selected);
   if(card){ card.data.image = url; const el = document.getElementById(card.id); if(el){ const img = el.querySelector('.img'); if(img) img.src = url; } }
@@ -681,6 +742,7 @@ function createDefaultTextbox(pos){
   const id = "t" + Math.random().toString(36).slice(2,9);
   return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300 };
 }
+
 // Toolbar bindings
 document.getElementById("addProfileBtn").onclick = ()=>{
   const pos = { x: 100, y: 100 };
@@ -701,6 +763,7 @@ document.getElementById("deleteSelectedBtn").onclick = function(){
   if(!confirm("Delete selected item?")) return;
   if(selectedType === "card"){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
+    // Remove edges connected to this card
     edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
   } else if(selectedType === "textbox"){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
@@ -972,7 +1035,7 @@ async function refreshWebList() {
   } catch (e) { console.error("Failed to load Connection Webs list:", e); }
 }
 document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
-document.getElementById("loadWebBtn").onclick = ()=>{
+document.getElementById("loadWebBtn").onclick = () => {
   const name = webListDropdown.value || webNameInput.value.trim();
   if(!name) { alert("Pick or type a web name to load"); return; }
   subscribeToWeb(name);
