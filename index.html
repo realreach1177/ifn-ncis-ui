@@ -1,135 +1,158 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Connection Web — Full (Preserved + Enhancements)</title>
-
-<!-- Firebase (compat) -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-
+<meta charset="UTF-8" />
+<title>OrgChart Connection Web — Fixed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-:root{
-  --bg:#0f1113; --panel:#1c1c1c; --muted:#99aacc; --accent:#66aaff;
+html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden; }
+/* Toolbar (merged) */
+#toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
+.toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
+#toolbar button, #toolbar input, #toolbar select { border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer; font-size:14px; }
+#toolbar button { background:#333; color:#eee; transition: background-color 0.25s ease, box-shadow 0.25s ease; }
+#toolbar button:hover { background:#3f3f3f; box-shadow:0 0 10px rgba(255,255,255,0.08); }
+#saveWebBtn { background:#2e7d32; color:#fff; }
+#loadWebBtn { background:#1565c0; color:#fff; }
+#deleteWebBtn { background:#c62828; color:#fff; }
+#webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
+/* Stage and layers */
+#stage { position:absolute; inset:0; overflow:hidden; background:#141414; cursor:grab;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size:40px 40px;
 }
-html,body{height:100%;margin:0;background:var(--bg);color:#e6eef6;font-family: "Segoe UI", Roboto, system-ui, -apple-system;overflow:hidden;}
-/* Toolbar */
-#toolbar{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:92%;max-width:1200px;background:var(--panel);padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;z-index:1200;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
-.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:8px}
-.toolbar-left button,.toolbar-right button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;background:#2f3941}
-#addProfileBtn{background:#3949ab}
-#addTextBtn{background:#6a1b9a}
-#deleteSelectedBtn{background:#7b3d3d}
-#undoBtn,#redoBtn{background:#455a64}
-#searchBox{background:#23282d;border-radius:8px;padding:8px 10px;color:#cfe6ff;border:none;min-width:180px}
-
-/* right group */
-#webNameInput,#webListDropdown{background:#21272b;border-radius:8px;padding:8px 10px;color:#dfefff;border:none}
-#saveWebBtn{background:#2e7d32}
-#loadWebBtn{background:#1565c0}
-#deleteWebBtn{background:#c62828}
-
-/* Stage & viewport */
-#stage{position:absolute;inset:0;cursor:grab;background:
-  linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-  linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size:40px 40px}
-#viewport{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;overflow:visible}
-svg#wires{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1}
-#cards{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2}
-
-/* Card */
-.card{position:absolute;background:#202126;border-radius:12px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);color:#eaf6ff;cursor:grab;min-width:300px;display:flex;gap:12px;align-items:flex-start;z-index:10}
-.card.textNode{min-width:auto;background:transparent;color:#77aaff;font-weight:700;padding:6px 12px;box-shadow:none}
-.card .img{width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.06)}
-.card .info{flex:1}
-.card .name{font-size:18px;font-weight:800;color:var(--accent);margin-bottom:4px}
-.card .rank{font-weight:700;color:#cfe6ff;margin-bottom:6px}
-.card .faction{display:inline-block;padding:6px 10px;border-radius:8px;background:#233a54;color:#dff1ff;font-weight:700;margin-bottom:8px}
-.card .desc{margin-top:8px;color:#9fbfdc;font-size:13px}
-.file-list{margin-top:8px;padding-left:18px;color:#8fbfe0;font-size:13px;max-height:90px;overflow:auto}
-.anchor{position:absolute;width:14px;height:14px;border-radius:50%;background:#ffd54f;border:2px solid #222;top:-8px;left:50%;transform:translate(-50%,-50%);cursor:crosshair;box-shadow:0 1px 6px rgba(0,0,0,0.5)}
-
-/* Editor */
-#editPanel{position:fixed;right:16px;top:72px;width:380px;background:var(--panel);padding:18px;border-radius:12px;z-index:1500;display:none;box-shadow:-8px 16px 40px rgba(0,0,0,0.6)}
-#editPanel h3{margin:0 0 10px 0;color:var(--accent);font-size:18px}
-#editPanel label{display:block;margin-top:10px;font-weight:700;color:#cfe6ff}
-#editPanel input,#editPanel select,#editPanel textarea{width:100%;padding:8px;border-radius:8px;border:none;background:#1b2430;color:#e6f6ff;margin-top:6px}
-#editPanel textarea{min-height:80px}
-#editPanel .btns{display:flex;gap:8px;margin-top:12px}
-#editPanel button{flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:800;color:#fff}
-#editPanel .save{background:#2e7d32}#editPanel .cancel{background:#8a4b4b}
-
-/* Minimap */
-#minimap{position:fixed;right:18px;bottom:18px;width:240px;height:160px;background:#0f1315;border-radius:10px;border:1px solid #1f2a33;z-index:1400;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
-#minimapSVG{width:100%;height:100%}
-
-/* small helpers */
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:#0b1220;padding:10px 18px;border-radius:8px;color:#fff;z-index:999999;box-shadow:0 6px 20px rgba(0,0,0,0.7)}
-.selected{outline:3px solid rgba(255,200,40,0.25);box-shadow:0 0 20px rgba(255,200,40,0.12)}
-.dragging{box-shadow:0 0 26px 4px rgba(102,170,255,0.12)}
+#viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
+#wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1; }
+#cards { position:absolute; left:0; top:0; width:100%; height:100%; }
+/* Cards and textboxes */
+.card, .textbox-wrapper {
+  position:absolute; padding:0; box-sizing:border-box;
+  user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
+}
+.card { width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:hidden; }
+.textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
+.textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, Segoe UI, Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; }
+.card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
+.card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
+.img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
+.info { flex:1; overflow:hidden; }
+.name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
+.rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
+.bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
+.status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+.dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
+.alive { background:#4caf50; }
+.dead { background:#e53935; }
+.unknown { background:#212121; border:1.5px solid #78909c; }
+.anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20; cursor:crosshair; }
+/* Editor side panel */
+#editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
+  box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
+#editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
+#editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
+#editor input, #editor select, #editor textarea {
+  width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px;
+}
+#editor textarea { min-height:60px; }
+#editor .btns { margin-top:14px; display:flex; gap:10px; }
+#editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
+#editor .btns button:hover { background:#1769aa; }
+#editor .btns button.save { background:#4caf50; }
+#editor .btns button.save:hover { background:#388e3c; }
+.file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
+.file-list a { color:#74b9ff; text-decoration:none; }
+.file-list a:hover { text-decoration:underline; }
+/* Toasts */
+.toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
+  box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
 </style>
 </head>
 <body>
-
-<div id="toolbar" role="toolbar" aria-label="Main controls">
-  <div class="toolbar-left" role="group">
-    <button id="addProfileBtn" title="Add Profile (double-click stage too)">Add Profile</button>
-    <button id="addTextBtn" title="Add Text Label">Add Text</button>
-    <button id="deleteSelectedBtn" title="Delete selected card/textbox">Delete Selected</button>
-    <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
-    <button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
-    <input id="searchBox" type="text" placeholder="Search name, branch, rank..." aria-label="Search"/>
+<!-- Toolbar -->
+<div id="toolbar">
+  <div class="toolbar-left">
+    <button id="addProfileBtn" title="Add Profile Card">Add Profile</button>
+    <button id="addTextBtn" title="Add Text Box">Add Text</button>
+    <button id="deleteSelectedBtn" title="Delete Selected">Delete</button>
+    <button id="undoBtn" title="Undo">Undo</button>
+    <button id="redoBtn" title="Redo">Redo</button>
+    <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
   </div>
-
-  <div class="toolbar-right" role="group" aria-label="Workspace controls">
-    <input id="webNameInput" type="text" placeholder="Connection Web name" aria-label="Workspace name"/>
-    <select id="webListDropdown" aria-label="Saved webs"></select>
-    <button id="saveWebBtn">Save</button>
-    <button id="loadWebBtn">Load</button>
-    <button id="deleteWebBtn">Delete</button>
+  <div class="toolbar-right">
+    <input type="text" id="webNameInput" placeholder="Web Name" />
+    <select id="webListDropdown" title="Select Connection Web"></select>
+    <button id="saveWebBtn" title="Save Connection Web">Save</button>
+    <button id="loadWebBtn" title="Load Connection Web">Load</button>
+    <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
   </div>
 </div>
-
+<!-- Stage -->
 <div id="stage">
   <div id="viewport">
     <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
     <div id="cards"></div>
   </div>
 </div>
+<!-- Editor -->
+<div id="editor">
+  <header>Edit Item</header>
+  <label>Profile Picture URL</label>
+  <input id="fImage" type="url" placeholder="https://..." />
+  <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+    <input id="fImageFile" type="file" accept="image/*" />
+    <button id="btnUseLocalImage" type="button">Use File</button>
+  </div>
+  <label>Name</label>
+  <input id="fName" type="text" />
+  <label>Status</label>
+  <select id="fStatus">
+    <option>Alive</option>
+    <option>Dead</option>
+    <option>Unknown</option>
+  </select>
+  <label>Branch</label>
+  <select id="fBranch"></select>
+  <label>Subbranch</label>
+  <input id="fSubbranch" type="text" />
+  <label>Rank</label>
+  <select id="fRank"></select>
+  <label>Short Description</label>
+  <textarea id="fDesc"></textarea>
 
-<div id="editPanel" role="dialog" aria-modal="true" aria-hidden="true">
-  <h3>Edit Profile</h3>
-  <label>Image URL</label><input id="fImage" type="url" placeholder="https://..."/>
-  <label>Name</label><input id="fName" type="text" />
-  <label>Status</label><select id="fStatus"><option>Unknown</option><option>Alive</option><option>Dead</option></select>
-  <label>Faction</label><select id="fFaction"></select>
-  <label>Sub-branch</label><input id="fSubbranch" type="text" />
-  <label>Rank</label><select id="fRank"></select>
-  <label>Details</label><textarea id="fDesc"></textarea>
+  <label>Related Files (external URL)</label>
+  <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <input id="fRelatedName" type="text" placeholder="Display name for hyperlink" />
+  <div style="display:flex; gap:8px; margin-top:6px;">
+    <button id="btnAddRelated" type="button">Add URL</button>
+    <input id="fRelatedFile" type="file" />
+    <button id="btnAddRelatedFile" type="button">Add File</button>
+  </div>
+  <div id="relatedList" class="file-list">(none)</div>
 
-  <label>Attached files (from DB)</label>
-  <select id="selectFiles" multiple size="6" style="width:100%;margin-top:6px;background:#0f1b26;color:#dff1ff;border-radius:6px;padding:6px;"></select>
+  <label>Other Files (external URL)</label>
+  <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
+  <div style="display:flex; gap:8px; margin-top:6px;">
+    <button id="btnAddOther" type="button">Add URL</button>
+    <input id="fOtherFile" type="file" />
+    <button id="btnAddOtherFile" type="button">Add File</button>
+  </div>
+  <div id="otherList" class="file-list">(none)</div>
 
-  <label>External file URL (add)</label><input id="fExternalUrl" type="url" placeholder="https://..." />
-  <label>External file display name</label><input id="fExternalName" type="text" placeholder="Optional display name" />
-
-  <label style="margin-top:10px;"><input id="fEnableSnap" type="checkbox" /> Enable snapping for this node</label>
-
-  <div style="display:flex;gap:8px;margin-top:12px;">
-    <button id="btnSavePanel" class="save">Save</button>
-    <button id="btnCancelPanel" class="cancel">Cancel</button>
+  <div class="btns">
+    <button class="save" id="btnSave" type="button">Save</button>
+    <button id="btnCancel" type="button">Cancel</button>
   </div>
 </div>
 
-<div id="minimap"><svg id="minimapSVG" xmlns="http://www.w3.org/2000/svg"></svg></div>
-
 <script>
-/* ======================
-   Firebase Initialization
-   ====================== */
+// Firebase config - replace if different
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -137,793 +160,906 @@ const firebaseConfig = {
   projectId: "ncis-intranet",
   storageBucket: "ncis-intranet.appspot.com",
   messagingSenderId: "1010993365309",
-  appId: "1:1010993365309:web:8c72db8c5d95c061adc554",
+  appId: "1:1010993365309:c72db8c5d95c061adc554",
   measurementId: "G-GLMXRGGSHX"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
 const auth = firebase.auth();
-auth.signInAnonymously().catch(()=>{});
+const db = firebase.database();
+auth.signInAnonymously().catch(console.error);
 
-/* ======================
-   App State
-   ====================== */
-let cards = {};      // map id -> { id, x, y, data:{...}, isText }
-let edges = {};      // map id -> { id, source, target }
-let textBoxes = {};  // map id -> { id, x, y, content }
-let selectedId = null;
-let selectedType = null; // 'node'/'edge'/'text'
-let tx = 0, ty = 0, scale = 1;
-let undoStack = [], redoStack = [];
-let autosave = false;
+// App state
+let cards = [];
+let edges = [];
+let textBoxes = [];
+let selected = null;
+let selectedType = null; // 'card' or 'textbox'
+let scale = 1, tx = 0, ty = 0;
+let undoStack = [];
+let redoStack = [];
+let snap = 10;
+let editingTextLabel = false;
 
-const stage = document.getElementById('stage');
 const viewport = document.getElementById('viewport');
-const wires = document.getElementById('wires');
+const stage = document.getElementById('stage');
 const cardsLayer = document.getElementById('cards');
-const minimapSVG = document.getElementById('minimapSVG');
-const webListDropdown = document.getElementById('webListDropdown');
-const webNameInput = document.getElementById('webNameInput');
+const wiresLayer = document.getElementById('wires');
 
-/* Branch colors and rank lists (kept) */
-const factions = ["None","United States","Army","Navy","Marines","Air Force","Taliban","Al-Qaeda"];
-const factionColors = {
-  "None":"#777777","United States":"#3f51b5","Army":"#4caf50","Navy":"#2196f3","Marines":"#f44336","Air Force":"#03a9f4","Taliban":"#9c27b0","Al-Qaeda":"#ff9800"
+const branchColors = {
+  "None": "#777777",
+  "United States Army": "#4caf50",
+  "United States Navy": "#2196f3",
+  "United States Marine Corps": "#fbc02d",
+  "United States Air Force": "#00bcd4",
+  "Taliban": "#ef6c00",
+  "Taliban Special Forces": "#b38800",
+  "Al-Qaeda": "#d7a857"
 };
 const rankLists = {
   "None":["None"],
-  "United States":["General","Colonel","Major","Captain","Lieutenant"],
-  "Army":["General","Colonel","Major","Captain","Lieutenant"],
-  "Navy":["Admiral","Captain","Commander","Lieutenant"],
-  "Marines":["General","Colonel","Major","Captain","Lieutenant"],
-  "Air Force":["General","Colonel","Major","Captain","Lieutenant"],
-  "Taliban":["Leader","Commander","Soldier"],
-  "Al-Qaeda":["Leader","Commander"]
+  "United States Army": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"
+  ],
+  "United States Navy": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"
+  ],
+  "United States Marine Corps": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"
+  ],
+  "United States Air Force": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"
+  ],
+  "Taliban": [
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
+  ],
+  "Taliban Special Forces": [
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"
+  ],
+  "Al-Qaeda": [
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
+  ]
 };
 
-/* ======================
-   Utilities
-   ====================== */
-function randId(prefix='id'){ return prefix + Math.random().toString(36).slice(2,10); }
-function toast(msg, t=1300){ const el = document.createElement('div'); el.className='toast'; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, t); }
-function fileNameFromUrl(url){ try{ return new URL(url).pathname.split('/').pop()||url }catch{ return (url||'').split('/').pop()||url } }
-function applyTransform(){ viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})` }
-
-/* convert client coordinates to world (viewport) coordinates */
-function clientToWorld(cx,cy){
-  const r = stage.getBoundingClientRect();
-  const sx = cx - r.left;
-  const sy = cy - r.top;
+function contrast(hex) {
+  hex = (hex || '').replace('#', '');
+  if (hex.length !== 6) return '#000';
+  const r = parseInt(hex.slice(0,2),16), g= parseInt(hex.slice(2,4),16), b= parseInt(hex.slice(4,6),16);
+  return ((r*299+g*587+b*114)/1000) >= 128 ? '#000' : '#fff';
+}
+function fileNameFromUrl(url) {
+  if(typeof url !== 'string') return '';
+  try { let p = new URL(url).pathname; return p.substring(p.lastIndexOf('/') + 1); }
+  catch { return url.split('/').pop() || ''; }
+}
+function toast(msg){
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
+}
+function applyTransform(){
+  viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+}
+function clientToWorld(cx, cy){
+  const r=stage.getBoundingClientRect();
+  const sx=cx-r.left, sy=cy-r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
+function snapToGrid(v){ return Math.round(v / snap) * snap; }
 
-/* ======================
-   Rendering: cards, textboxes, edges
-   ====================== */
-function createCardElement(node){
-  const el = document.createElement('div');
-  el.className = 'card' + (node.isText ? ' textNode' : '');
-  el.id = 'card-' + node.id;
-  el.style.left = node.x + 'px';
-  el.style.top = node.y + 'px';
-  // content
-  if(node.isText){
-    el.innerHTML = `<div class="info"><div class="name">${node.data.name || 'Text'}</div></div>`;
-  } else {
-    const d = node.data || {};
-    el.innerHTML = `<img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" alt="avatar" />
-      <div class="info">
-        <div class="name" style="color:${d.branchColor || factionColors[d.faction] || '#66aaff'}">${d.name || 'New Profile'}</div>
-        <div class="rank">${d.rank || ''}</div>
-        <div class="faction">${d.faction || 'None'}${d.subBranch ? ' — ' + d.subBranch : ''}</div>
-        <div class="status"><span class="statusDot ${(d.status||'Unknown').toLowerCase()}"></span> ${d.status || 'Unknown'}</div>
-        <div class="description">${d.details || ''}</div>
-        <ul class="file-list">${(d.files || []).map(f=>`<li><a href="${f.url}" target="_blank" rel="noopener">${f.name||fileNameFromUrl(f.url)}</a></li>`).join('')}</ul>
-      </div>
-      <div class="anchor" title="Drag to link"></div>`;
-  }
+function linkListHTML(files) {
+  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+}
 
-  // click selects and opens editor
-  el.addEventListener('click', e => {
+/* ---------- Edge drawing & anchor positioning ---------- */
+/* Return anchor center in WORLD coordinates (i.e., the coordinate space used for SVG lines) */
+function anchorCenter(cardId) {
+  const cardEl = document.getElementById(cardId);
+  if (!cardEl) return null;
+  const anchorEl = cardEl.querySelector('.anchor') || cardEl;
+  const rectAnchor = anchorEl.getBoundingClientRect();
+  const rectViewport = viewport.getBoundingClientRect();
+  const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
+  const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
+  // convert screen px to world coords (same mapping used throughout)
+  return { x: (ax - tx) / scale, y: (ay - ty) / scale };
+}
+
+function updateEdges() {
+  // Clear existing
+  while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
+  edges.forEach(edge => {
+    const aCard = cards.find(c => c.id === edge.a.card);
+    const bCard = cards.find(c => c.id === edge.b.card);
+    if (!aCard || !bCard) return;
+    const posA = anchorCenter(aCard.id);
+    const posB = anchorCenter(bCard.id);
+    if (!posA || !posB) return;
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", posA.x);
+    line.setAttribute("y1", posA.y);
+    line.setAttribute("x2", posB.x);
+    line.setAttribute("y2", posB.y);
+    line.setAttribute("stroke", "#ffd54f");
+    line.setAttribute("stroke-width", "4");
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("opacity", "0.9");
+    wiresLayer.appendChild(line);
+  });
+}
+
+/* ---------- Rendering cards & textboxes ---------- */
+function makeCardView(card) {
+  const existing = document.getElementById(card.id);
+  if (existing) existing.remove();
+  const c = document.createElement('div');
+  c.className = 'card';
+  c.id = card.id;
+  c.style.left = card.x + 'px';
+  c.style.top = card.y + 'px';
+  c.style.setProperty('--branchGlow', card.data.branchColor || '#4caf50');
+  c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
+  const d = card.data;
+  const barText = contrast(d.branchColor || '#777');
+  c.innerHTML = `
+    <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
+    <div class="info">
+      <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
+      <div class="rank">${d.rank || ''}</div>
+      <div class="bar" style="background:${d.branchColor};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
+      <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
+      <div class="desc">${d.desc || ''}</div>
+      <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
+        ${linkListHTML(d.relatedFiles)}${linkListHTML(d.otherFiles)}
+      </ul>
+    </div>
+    <div class="anchor" title="Drag to link"></div>
+  `;
+  // Click to select (but do not interfere when typing inside card's internal fields)
+  c.addEventListener('click', e => {
     e.stopPropagation();
-    selectNode(node.id);
-    if(!node.isText) openEditor(node.id);
+    if (editingTextLabel) return;
+    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    selected = card.id; selectedType = 'card'; c.classList.add('selected');
+    openEditor(card.id, 'card');
   });
 
-  // dragging for card
-  let dragging = false, offset = {x:0,y:0};
-  el.addEventListener('pointerdown', e => {
-    if(e.target.classList.contains('anchor')) return; // anchor handled elsewhere
-    dragging = true; el.classList.add('dragging'); el.setPointerCapture(e.pointerId);
+  // Dragging for cards (ignore pointerdown on anchor)
+  let dragging = false;
+  let offset = {x:0,y:0};
+  c.addEventListener('pointerdown', e => {
+    if(e.target.classList.contains('anchor')) return;
+    dragging = true;
+    c.classList.add('dragging');
+    c.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
-    offset.x = wp.x - node.x; offset.y = wp.y - node.y;
+    offset.x = wp.x - card.x;
+    offset.y = wp.y - card.y;
   });
-  el.addEventListener('pointermove', e => {
+  c.addEventListener('pointermove', e => {
     if(!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
-    node.x = wp.x - offset.x; node.y = wp.y - offset.y;
-    el.style.left = node.x + 'px'; el.style.top = node.y + 'px';
+    card.x = snapToGrid(wp.x - offset.x);
+    card.y = snapToGrid(wp.y - offset.y);
+    c.style.left = card.x + 'px';
+    c.style.top = card.y + 'px';
     updateEdges();
   });
-  el.addEventListener('pointerup', e => {
-    dragging = false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId); }catch{}
+  c.addEventListener('pointerup', e => {
+    if(!dragging) return;
+    dragging = false;
+    c.classList.remove('dragging');
+    try { c.releasePointerCapture(e.pointerId); } catch{}
     snapshot();
   });
-  el.addEventListener('pointercancel', e => {
-    dragging = false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId); }catch{} snapshot();
+  c.addEventListener('pointercancel', e => {
+    dragging = false;
+    c.classList.remove('dragging');
+    try { c.releasePointerCapture(e.pointerId); } catch{}
   });
 
-  cardsLayer.appendChild(el);
-  return el;
+  cardsLayer.appendChild(c);
+  return c;
 }
 
-function createTextElement(box){
-  const el = document.createElement('div');
-  el.className = 'card textNode';
-  el.id = 'card-' + box.id;
-  el.style.left = box.x + 'px';
-  el.style.top = box.y + 'px';
-  el.innerHTML = `<div class="info"><div class="name">${box.content || 'Text Label'}</div></div>`;
-  el.addEventListener('click', e => { e.stopPropagation(); selectNode(box.id); openEditor(box.id, true); });
-  let dragging=false, offset={x:0,y:0};
-  el.addEventListener('pointerdown', e=>{ dragging=true; el.classList.add('dragging'); el.setPointerCapture(e.pointerId); const wp = clientToWorld(e.clientX,e.clientY); offset.x = wp.x - box.x; offset.y = wp.y - box.y; });
-  el.addEventListener('pointermove', e=>{ if(!dragging) return; const wp = clientToWorld(e.clientX,e.clientY); box.x = wp.x - offset.x; box.y = wp.y - offset.y; el.style.left = box.x + 'px'; el.style.top = box.y + 'px'; });
-  el.addEventListener('pointerup', e=>{ dragging=false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId);}catch{} snapshot(); });
-  cardsLayer.appendChild(el);
-  return el;
-}
+/* Single, consolidated textbox view with native textarea for smooth resizing */
+function makeTextBoxView(box) {
+  const existing = document.getElementById(box.id);
+  if (existing) existing.remove();
 
-function createEdgeElement(edge){
-  const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
-  ln.setAttribute('stroke','#9fbfdc'); ln.setAttribute('stroke-width','3'); ln.dataset.eid = edge.id;
-  wires.appendChild(ln);
-  return ln;
-}
+  const wrapper = document.createElement('div');
+  wrapper.className = 'textbox-wrapper';
+  wrapper.id = box.id;
+  wrapper.style.left = box.x + 'px';
+  wrapper.style.top = box.y + 'px';
+  wrapper.style.width = (box.width || 300) + 'px';
 
-function anchorCenter(nodeId){
-  const el = document.getElementById('card-'+nodeId);
-  if(!el) return null;
-  const anchor = el.querySelector('.anchor');
-  const rect = anchor.getBoundingClientRect();
-  const stageRect = stage.getBoundingClientRect();
-  return { x: (rect.left + rect.width/2 - stageRect.left - tx) / scale, y: (rect.top + rect.height/2 - stageRect.top - ty) / scale };
-}
+  const textarea = document.createElement('textarea');
+  textarea.className = 'textbox';
+  textarea.value = box.content || "";
+  textarea.style.width = '100%';
+  if (box.height) textarea.style.height = box.height + 'px';
+  textarea.spellcheck = false;
 
-function updateEdgePosition(edge){
-  const ln = wires.querySelector(`line[data-eid="${edge.id}"]`);
-  if(!ln) return;
-  const a = anchorCenter(edge.source);
-  const b = anchorCenter(edge.target);
-  if(!a || !b){ ln.remove(); return; }
-  ln.setAttribute('x1', a.x); ln.setAttribute('y1', a.y);
-  ln.setAttribute('x2', b.x); ln.setAttribute('y2', b.y);
-}
-
-function updateEdges(){
-  // ensure svg lines exist
-  Object.values(edges).forEach(e=>{
-    let ln = wires.querySelector(`line[data-eid="${e.id}"]`);
-    if(!ln) ln = createEdgeElement(e);
-    updateEdgePosition(e);
+  // Prevent textarea clicks/focus from opening editor
+  textarea.addEventListener('pointerdown', e => {
+    e.stopPropagation(); // stops stage/card click handlers
   });
-}
+  textarea.addEventListener('focus', e => { editingTextLabel = true; });
+  textarea.addEventListener('blur', e => { editingTextLabel = false; snapshot(); });
 
-function renderAll(){
-  // clear and rebuild DOM card elements (simple, robust)
-  cardsLayer.innerHTML = '';
-  wires.innerHTML = '';
-  // nodes
-  Object.values(cards).forEach(n=>{
-    if(n.isText) createTextElement(n);
-    else createCardElement(n);
+  // Keep model content in sync
+  textarea.addEventListener('input', e => {
+    box.content = textarea.value;
   });
-  // edges
-  Object.values(edges).forEach(e => createEdgeElement(e));
-  updateEdges();
-  applyTransform();
-  renderMinimapAutoFit();
-}
 
-/* ======================
-   History: undo/redo
-   ====================== */
-function snapshot(){
-  const state = {
-    cards: JSON.parse(JSON.stringify(cards)),
-    edges: JSON.parse(JSON.stringify(edges)),
-    tx, ty, scale
-  };
-  undoStack.push(state);
-  if(undoStack.length>100) undoStack.shift();
-  redoStack = [];
-}
-function undo(){
-  if(!undoStack.length){ toast('Nothing to undo'); return; }
-  redoStack.push({cards: JSON.parse(JSON.stringify(cards)), edges: JSON.parse(JSON.stringify(edges)), tx, ty, scale});
-  const st = undoStack.pop();
-  cards = JSON.parse(JSON.stringify(st.cards));
-  edges = JSON.parse(JSON.stringify(st.edges));
-  tx = st.tx; ty = st.ty; scale = st.scale;
-  renderAll();
-  toast('Undo');
-}
-function redo(){
-  if(!redoStack.length){ toast('Nothing to redo'); return; }
-  undoStack.push({cards: JSON.parse(JSON.stringify(cards)), edges: JSON.parse(JSON.stringify(edges)), tx, ty, scale});
-  const st = redoStack.pop();
-  cards = JSON.parse(JSON.stringify(st.cards));
-  edges = JSON.parse(JSON.stringify(st.edges));
-  tx = st.tx; ty = st.ty; scale = st.scale;
-  renderAll();
-  toast('Redo');
-}
-
-/* ======================
-   Selection & Editor
-   ====================== */
-function selectNode(id){
-  // clear previous selection
-  if(selectedId){
-    const prev = document.getElementById('card-'+selectedId);
-    if(prev) prev.classList.remove('selected');
-  }
-  selectedId = id;
-  const el = document.getElementById('card-'+id);
-  if(el) el.classList.add('selected');
-  selectedType = (cards[id] && cards[id].isText) ? 'text' : 'node';
-}
-
-const editPanel = document.getElementById('editPanel');
-
-function openEditor(nodeId, isText=false){
-  if(!nodeId) return;
-  selectNode(nodeId);
-  const node = cards[nodeId];
-  // populate selects
-  populateFactionSelect();
-  // if text node, fill fDesc with content and show minimal UI (we still use same panel, but prefer description)
-  if(node.isText){
-    document.getElementById('fImage').value = '';
-    document.getElementById('fName').value = node.data.name || '';
-    document.getElementById('fStatus').value = 'Unknown';
-    document.getElementById('fFaction').value = 'None';
-    document.getElementById('fSubbranch').value = '';
-    document.getElementById('fRank').value = 'None';
-    document.getElementById('fDesc').value = node.data.name || '';
-    document.getElementById('selectFiles').innerHTML = '';
-    document.getElementById('fExternalUrl').value = '';
-    document.getElementById('fExternalName').value = '';
-    document.getElementById('fEnableSnap').checked = !!node.data.enableSnap;
-    editPanel.style.display = 'block';
-    editPanel.setAttribute('aria-hidden','false');
-    document.getElementById('fName').focus();
-    return;
-  }
-  const d = node.data || {};
-  document.getElementById('fImage').value = d.image || '';
-  document.getElementById('fName').value = d.name || '';
-  document.getElementById('fStatus').value = d.status || 'Unknown';
-  populateFactionSelect(d.faction || 'None');
-  populateRanks(d.faction || 'None', d.rank || 'None');
-  document.getElementById('fSubbranch').value = d.subBranch || '';
-  document.getElementById('fRank').value = d.rank || 'None';
-  document.getElementById('fDesc').value = d.details || '';
-  document.getElementById('fEnableSnap').checked = !!d.enableSnap;
-  // populate attached files list (selectFiles)
-  populateFilesForSelect(d.files || []).then(()=>{});
-  // clear external fields
-  document.getElementById('fExternalUrl').value = '';
-  document.getElementById('fExternalName').value = '';
-  editPanel.style.display = 'block';
-  editPanel.setAttribute('aria-hidden','false');
-  document.getElementById('fName').focus();
-}
-
-function closeEditor(){
-  editPanel.style.display = 'none';
-  editPanel.setAttribute('aria-hidden','true');
-}
-
-/* wire up editor save/cancel */
-document.getElementById('btnCancelPanel').addEventListener('click', ()=>{ closeEditor(); });
-document.getElementById('btnSavePanel').addEventListener('click', async ()=>{
-  if(!selectedId) return;
-  const node = cards[selectedId];
-  if(!node) return;
-  // if text node: save text content into name
-  if(node.isText){
-    node.data.name = document.getElementById('fName').value.trim();
-    // update DOM
-    const el = document.getElementById('card-'+node.id);
-    if(el) el.querySelector('.name').textContent = node.data.name;
-    snapshot();
-    renderAll();
-    closeEditor();
-    return;
-  }
-  // normal profile
-  const img = document.getElementById('fImage').value.trim();
-  const name = document.getElementById('fName').value.trim() || 'Unnamed';
-  const status = document.getElementById('fStatus').value;
-  const faction = document.getElementById('fFaction').value;
-  const subBranch = document.getElementById('fSubbranch').value.trim();
-  const rank = document.getElementById('fRank').value;
-  const details = document.getElementById('fDesc').value.trim();
-  const enableSnap = document.getElementById('fEnableSnap').checked;
-  // selected files from selectFiles
-  const selectedOptions = Array.from(document.getElementById('selectFiles').selectedOptions || []);
-  const filesList = selectedOptions.map(o => JSON.parse(o.value));
-  // external file
-  const extUrl = document.getElementById('fExternalUrl').value.trim();
-  const extName = document.getElementById('fExternalName').value.trim() || fileNameFromUrl(extUrl);
-  if(extUrl) filesList.push({ url: extUrl, name: extName });
-  // assign
-  node.data = node.data || {};
-  node.data.image = img;
-  node.data.name = name;
-  node.data.status = status;
-  node.data.faction = faction;
-  node.data.subBranch = subBranch;
-  node.data.rank = rank;
-  node.data.details = details;
-  node.data.files = filesList;
-  node.data.enableSnap = enableSnap;
-  node.data.branchColor = factionColors[faction] || '#777';
-  // persist to Firebase node path
-  await db.ref('orgchart/nodes/'+node.id).set(node);
-  // update UI
-  snapshot();
-  renderAll();
-  closeEditor();
-});
-
-/* ======================
-   populateFiles: gathers files from suspects, insurgents, confidential_informants
-   returns promise that resolves when selectFiles is filled
-   ====================== */
-async function populateFilesForSelect(selectedFiles = []){
-  const sel = document.getElementById('selectFiles');
-  sel.innerHTML = '<option disabled>Loading...</option>';
-  try{
-    const [susSnap, insSnap, ciSnap] = await Promise.all([
-      db.ref('suspects').get(),
-      db.ref('insurgents').get(),
-      db.ref('confidential_informants').get()
-    ]);
-    const files = [];
-    [susSnap, insSnap, ciSnap].forEach(snap => {
-      if(!snap.exists()) return;
-      const val = snap.val();
-      Object.keys(val).forEach(k=>{
-        const v = val[k];
-        if(v && v.docUrl){
-          files.push({ url: v.docUrl, name: (v.target ? v.target + ' [' + (v.creator || '') + ']' : fileNameFromUrl(v.docUrl)) });
-        }
-      });
-    });
-    sel.innerHTML = '';
-    files.forEach(f=>{
-      const opt = document.createElement('option');
-      opt.value = JSON.stringify(f);
-      opt.textContent = f.name || fileNameFromUrl(f.url);
-      // select if in selectedFiles
-      if(Array.isArray(selectedFiles) && selectedFiles.some(sf => sf.url === f.url)) opt.selected = true;
-      sel.appendChild(opt);
-    });
-    if(files.length === 0) sel.innerHTML = '<option disabled>(no files found)</option>';
-  }catch(err){
-    sel.innerHTML = '<option disabled>Error loading</option>';
-    console.error('populateFiles error', err);
-  }
-}
-
-/* ======================
-   Add / Delete / Text nodes
-   ====================== */
-document.getElementById('addProfileBtn').addEventListener('click', ()=>{
-  const id = randId('n');
-  const node = { id, x: 150 + Math.random()*200, y: 150 + Math.random()*200, isText: false, data: { name:'New Profile', image:'https://i.ibb.co/zhKnjbh1/unknownperson.png', faction:'None', rank:'None', subBranch:'', status:'Unknown', details:'', files:[], enableSnap:false } };
-  cards[id] = node;
-  // add to firebase nodes
-  db.ref('orgchart/nodes/'+id).set(node);
-  snapshot();
-  renderAll();
-  openEditor(id);
-});
-
-document.getElementById('addTextBtn').addEventListener('click', ()=>{
-  const id = randId('t');
-  const node = { id, x: 200 + Math.random()*200, y: 200 + Math.random()*200, isText: true, data:{ name: 'Text Label' } };
-  cards[id] = node;
-  snapshot();
-  renderAll();
-  openEditor(id, true);
-});
-
-document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
-  if(!selectedId){ alert('Select a node first'); return; }
-  if(!confirm('Delete selected item?')) return;
-  // delete from firebase if node
-  if(cards[selectedId] && !cards[selectedId].isText){
-    db.ref('orgchart/nodes/'+selectedId).remove().catch(()=>{});
-  }
-  // remove edges connected to this id
-  Object.keys(edges).forEach(eid=>{
-    const e = edges[eid];
-    if(e.source === selectedId || e.target === selectedId){
-      db.ref('orgchart/edges/'+eid).remove().catch(()=>{});
-      delete edges[eid];
+  // Dragging wrapper (only when pointerdown outside of the textarea's scroll/resize grab)
+  let dragging = false;
+  let offset = {x:0,y:0};
+  wrapper.addEventListener('pointerdown', e => {
+    // If pointerdown originates from textarea (e.g. resize handle), do not start drag
+    if (e.target === textarea) {
+      // allow resize — but textarea pointerdown will have been stopped above
+      return;
+    }
+    e.stopPropagation();
+    dragging = true;
+    wrapper.classList.add('dragging');
+    wrapper.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - box.x;
+    offset.y = wp.y - box.y;
+  });
+  wrapper.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    box.x = snapToGrid(wp.x - offset.x);
+    box.y = snapToGrid(wp.y - offset.y);
+    wrapper.style.left = box.x + 'px';
+    wrapper.style.top = box.y + 'px';
+    updateEdges();
+  });
+  wrapper.addEventListener('pointerup', e => {
+    if(dragging) {
+      dragging = false;
+      wrapper.classList.remove('dragging');
+      try { wrapper.releasePointerCapture(e.pointerId); } catch {}
+      snapshot();
     }
   });
-  // remove card
-  delete cards[selectedId];
-  const el = document.getElementById('card-'+selectedId); if(el) el.remove();
-  selectedId = null;
-  selectedType = null;
+  wrapper.addEventListener('pointercancel', e => {
+    dragging = false;
+    wrapper.classList.remove('dragging');
+    try { wrapper.releasePointerCapture(e.pointerId); } catch {}
+  });
+
+  // Observe size changes (native resize) to keep model in sync
+  const ro = new ResizeObserver(entries => {
+    for(const ent of entries) {
+      // ent.contentRect.width/height are in CSS px of the textarea
+      const w = Math.round(ent.contentRect.width);
+      const h = Math.round(ent.contentRect.height);
+      box.width = w;
+      box.height = h;
+      wrapper.style.width = w + 'px';
+      snapshot(); // snapshot when resizing occurs
+      updateEdges();
+    }
+  });
+  ro.observe(textarea);
+
+  // Click wrapper to select and open editor (but clicking inside textarea will not reach here)
+  wrapper.addEventListener('click', e => {
+    e.stopPropagation();
+    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    selected = box.id; selectedType = 'textbox'; wrapper.classList.add('selected');
+    openEditor(box.id, 'textbox');
+  });
+
+  wrapper.appendChild(textarea);
+  cardsLayer.appendChild(wrapper);
+  return wrapper;
+}
+
+/* ---------- General render ---------- */
+function render() {
+  // Clear layers then recreate
+  cardsLayer.innerHTML = '';
+  cards.forEach(makeCardView);
+  textBoxes.forEach(makeTextBoxView);
+  updateEdges();
+}
+
+/* ---------- Snapshot / undo / redo ---------- */
+function snapshot() {
+  try {
+    // Deep clone current state
+    const state = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
+    undoStack.push(state);
+    if (undoStack.length > 200) undoStack.shift();
+    redoStack = [];
+  } catch (e) {
+    console.warn("Snapshot failed", e);
+  }
+}
+
+function loadState(state) {
+  cards.splice(0, cards.length, ...(state.cards || []));
+  edges.splice(0, edges.length, ...(state.edges || []));
+  textBoxes.splice(0, textBoxes.length, ...(state.textBoxes || []));
+  tx = state.tx || 0;
+  ty = state.ty || 0;
+  scale = state.scale || 1;
+  applyTransform();
+}
+
+function undo() {
+  if (undoStack.length === 0) { toast("Nothing to undo"); return; }
+  try {
+    const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
+    redoStack.push(current);
+    const prev = undoStack.pop();
+    loadState(prev);
+    render();
+    toast("Undo");
+  } catch (e) { console.error(e); }
+}
+
+function redo() {
+  if (redoStack.length === 0) { toast("Nothing to redo"); return; }
+  try {
+    const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
+    undoStack.push(current);
+    const nxt = redoStack.pop();
+    loadState(nxt);
+    render();
+    toast("Redo");
+  } catch (e) { console.error(e); }
+}
+
+/* ---------- Selection / Editor ---------- */
+function deselect() {
+  if(selected){
+    let el = document.getElementById(selected);
+    if(el) el.classList.remove("selected");
+    selected = null; selectedType = null;
+  }
+  closeEditor();
+}
+function closeEditor() { document.getElementById("editor").style.display = "none"; }
+
+function openEditor(id, type){
+  let ed = document.getElementById("editor");
+  ed.style.display = "block";
+  // Clear fields
+  document.getElementById("fImage").value = "";
+  document.getElementById("fName").value = "";
+  fillBranchSelect("None");
+  fillRankSelect("None", "None");
+  document.getElementById("fSubbranch").value = "";
+  document.getElementById("fStatus").value = "Unknown";
+  document.getElementById("fDesc").value = "";
+  document.getElementById("relatedList").innerHTML = "(none)";
+  document.getElementById("otherList").innerHTML = "(none)";
+  document.getElementById("fRelatedUrl").value = "";
+  document.getElementById("fRelatedName").value = "";
+  document.getElementById("fOtherUrl").value = "";
+  document.getElementById("fOtherName").value = "";
+  document.getElementById("fImageFile").value = "";
+  document.getElementById("fRelatedFile").value = "";
+  document.getElementById("fOtherFile").value = "";
+
+  selected = id; selectedType = type;
+
+  if(type === "card"){
+    const card = cards.find(c => c.id === id);
+    if(!card) return;
+    document.getElementById("fImage").value = card.data.image || "";
+    document.getElementById("fName").value = card.data.name || "";
+    fillBranchSelect(card.data.branch);
+    fillRankSelect(card.data.branch, card.data.rank);
+    document.getElementById("fSubbranch").value = card.data.subbranch || "";
+    document.getElementById("fStatus").value = card.data.status || "Unknown";
+    document.getElementById("fDesc").value = card.data.desc || "";
+    renderFileList("relatedList", card.data.relatedFiles);
+    renderFileList("otherList", card.data.otherFiles);
+  } else if(type === "textbox"){
+    const box = textBoxes.find(t => t.id === id);
+    if(!box) return;
+    document.getElementById("fDesc").value = box.content || "";
+  }
+}
+
+function fillBranchSelect(selectedBranch) {
+  const sel = document.getElementById("fBranch");
+  sel.innerHTML = "";
+  Object.keys(branchColors).forEach(b=>{
+    const opt = document.createElement("option");
+    opt.value = b; opt.textContent = b;
+    if(b === selectedBranch) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function fillRankSelect(branch, selectedRank){
+  const sel = document.getElementById("fRank");
+  sel.innerHTML = "";
+  (rankLists[branch] || ['None']).forEach(r=>{
+    const opt = document.createElement("option");
+    opt.value = r; opt.textContent = r;
+    if(r === selectedRank) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+function renderFileList(containerId, files){
+  const cont = document.getElementById(containerId);
+  cont.innerHTML = "";
+  if(!files || files.length === 0){
+    cont.textContent = "(none)";
+    return;
+  }
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 0';
+  ul.style.paddingLeft = '18px';
+  files.forEach(f=>{
+    const li = document.createElement('li');
+    const a = document.createElement("a");
+    a.href = f.url || f;
+    a.textContent = f.name || fileNameFromUrl(f.url || f);
+    a.target = "_blank"; a.rel = "noopener";
+    li.appendChild(a);
+    ul.appendChild(li);
+  });
+  cont.appendChild(ul);
+}
+
+// Editor: URL and local files handlers
+document.getElementById("btnAddRelated").onclick = ()=>{
+  if(!selected || selectedType !== 'card') return alert("No card selected");
+  const url = document.getElementById("fRelatedUrl").value.trim();
+  const name = document.getElementById("fRelatedName").value.trim() || fileNameFromUrl(url);
+  if(!url) return alert("Please enter a URL");
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  card.data.relatedFiles = card.data.relatedFiles || [];
+  if(!card.data.relatedFiles.some(f=>f.url === url)) {
+    card.data.relatedFiles.push({url, name});
+    renderFileList("relatedList", card.data.relatedFiles);
+    document.getElementById("fRelatedUrl").value = "";
+    document.getElementById("fRelatedName").value = "";
+    snapshot();
+  }
+};
+document.getElementById("btnAddOther").onclick = ()=>{
+  if(!selected || selectedType !== 'card') return alert("No card selected");
+  const url = document.getElementById("fOtherUrl").value.trim();
+  const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
+  if(!url) return alert("Please enter a URL");
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  card.data.otherFiles = card.data.otherFiles || [];
+  card.data.otherFiles.push({url, name});
+  renderFileList("otherList", card.data.otherFiles);
+  document.getElementById("fOtherUrl").value = "";
+  document.getElementById("fOtherName").value = "";
   snapshot();
-  renderAll();
+};
+function addLocalFileTo(listKey, inputElId){
+  if(!selected || selectedType !== 'card') return alert("No card selected");
+  const inp = document.getElementById(inputElId);
+  if(!inp.files || inp.files.length === 0) return alert("Choose a file");
+  const file = inp.files[0];
+  const url = URL.createObjectURL(file);
+  const name = file.name;
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  card.data[listKey] = card.data[listKey] || [];
+  card.data[listKey].push({url, name});
+  renderFileList(listKey === 'relatedFiles' ? "relatedList" : "otherList", card.data[listKey]);
+  inp.value = "";
+  snapshot();
+}
+document.getElementById("btnAddRelatedFile").onclick = ()=> addLocalFileTo('relatedFiles','fRelatedFile');
+document.getElementById("btnAddOtherFile").onclick = ()=> addLocalFileTo('otherFiles','fOtherFile');
+
+document.getElementById("btnUseLocalImage").onclick = ()=>{
+  if(!selected || selectedType !== 'card') return alert("No card selected");
+  const f = document.getElementById("fImageFile");
+  if(!f.files || f.files.length===0) return alert("Choose an image");
+  const url = URL.createObjectURL(f.files[0]);
+  document.getElementById("fImage").value = url;
+  const card = cards.find(c=>c.id === selected);
+  if(card){ card.data.image = url; const el = document.getElementById(card.id); if(el){ const img = el.querySelector('.img'); if(img) img.src = url; } }
+  f.value = "";
+  snapshot();
+};
+
+// Save/cancel in editor
+document.getElementById("btnSave").onclick = ()=>{
+  if(!selected) return;
+  if(selectedType === 'card'){
+    const card = cards.find(c=>c.id === selected);
+    if(!card) return;
+    card.data.image = document.getElementById("fImage").value.trim();
+    card.data.name = document.getElementById("fName").value.trim();
+    card.data.branch = document.getElementById("fBranch").value;
+    card.data.subbranch = document.getElementById("fSubbranch").value.trim();
+    card.data.rank = document.getElementById("fRank").value;
+    card.data.status = document.getElementById("fStatus").value;
+    card.data.desc = document.getElementById("fDesc").value.trim();
+    card.data.branchColor = branchColors[card.data.branch] || "#777";
+    // Re-render card
+    const oldEl = document.getElementById(card.id);
+    if(oldEl) oldEl.remove();
+    makeCardView(card);
+    updateEdges();
+  } else if(selectedType === 'textbox'){
+    const box = textBoxes.find(t => t.id === selected);
+    if(!box) return;
+    box.content = document.getElementById("fDesc").value.trim();
+    const oldEl = document.getElementById(box.id);
+    if(oldEl){
+      const ta = oldEl.querySelector('textarea');
+      if(ta) ta.value = box.content;
+    }
+  }
+  closeEditor();
+  snapshot();
+  render();
+};
+document.getElementById("btnCancel").onclick = closeEditor;
+document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
+
+/* ---------- Create new elements ---------- */
+function createDefaultCard(pos){
+  const id = "c" + Math.random().toString(36).slice(2,9);
+  const newCard = {
+    id,
+    x: snapToGrid(pos.x - 180),
+    y: snapToGrid(pos.y - 90),
+    data: {
+      image: "https://i.ibb.co/zhKnjbh1/unknownperson.png",
+      name: "New Profile",
+      branch: "None",
+      subbranch: "",
+      rank: "None",
+      status: "Unknown",
+      desc: "",
+      relatedFiles: [],
+      otherFiles: [],
+      branchColor: branchColors["None"],
+    },
+  };
+  return newCard;
+}
+function createDefaultTextbox(pos){
+  const id = "t" + Math.random().toString(36).slice(2,9);
+  return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300, height: null };
+}
+
+/* ---------- Toolbar bindings ---------- */
+document.getElementById("addProfileBtn").onclick = ()=>{
+  const pos = { x: 100, y: 100 };
+  const newCard = createDefaultCard(pos);
+  cards.push(newCard);
+  selected = newCard.id; selectedType = 'card';
+  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
+};
+document.getElementById("addTextBtn").onclick = ()=>{
+  const pos = { x: 200, y: 200 };
+  const newBox = createDefaultTextbox(pos);
+  textBoxes.push(newBox);
+  selected = newBox.id; selectedType = 'textbox';
+  makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
+};
+document.getElementById("deleteSelectedBtn").onclick = function(){
+  if(!selected) { alert("Select a card or textbox first"); return; }
+  if(!confirm("Delete selected item?")) return;
+  if(selectedType === "card"){
+    cards.splice(cards.findIndex(c => c.id === selected), 1);
+    // Remove edges connected to this card
+    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
+  } else if(selectedType === "textbox"){
+    textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
+  }
+  const el = document.getElementById(selected);
+  if(el) el.remove();
+  selected = null; selectedType = null; closeEditor(); render(); snapshot();
+};
+document.getElementById("undoBtn").onclick = undo;
+document.getElementById("redoBtn").onclick = redo;
+
+/* ---------- Stage interactions ---------- */
+// Double-click stage to add a card (guard when editing text)
+stage.addEventListener("dblclick", e=>{
+  if (editingTextLabel) return;
+  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  const newCard = createDefaultCard(pos);
+  cards.push(newCard);
+  selected = newCard.id; selectedType = 'card';
+  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 });
 
-/* ======================
-   Anchor drag linking
-   ====================== */
-let anchorDrag = { active:false, startId:null, tmpLine:null };
-stage.addEventListener('pointerdown', e=>{
-  const target = e.target;
-  if(!target.classList.contains('anchor')) return;
-  const cardEl = target.closest('.card');
-  if(!cardEl) return;
-  anchorDrag.active = true;
-  anchorDrag.startId = cardEl.id.replace('card-','');
-  // create temporary svg line
-  const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
-  ln.setAttribute('stroke','#ffd54f'); ln.setAttribute('stroke-width','3'); ln.setAttribute('stroke-linecap','round'); ln.setAttribute('stroke-opacity','0.95');
-  wires.appendChild(ln);
-  anchorDrag.tmpLine = ln;
-  const s = anchorCenter(anchorDrag.startId);
-  if(s){ ln.setAttribute('x1', s.x); ln.setAttribute('y1', s.y); ln.setAttribute('x2', s.x); ln.setAttribute('y2', s.y); }
-  target.setPointerCapture(e.pointerId);
-});
-stage.addEventListener('pointermove', e=>{
-  if(!anchorDrag.active) return;
-  const p = clientToWorld(e.clientX, e.clientY);
-  if(anchorDrag.tmpLine){ anchorDrag.tmpLine.setAttribute('x2', p.x); anchorDrag.tmpLine.setAttribute('y2', p.y); }
-});
-stage.addEventListener('pointerup', e=>{
-  if(!anchorDrag.active) return;
-  anchorDrag.active = false;
-  if(anchorDrag.tmpLine){ anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  let targetCard = el ? el.closest('.card') : null;
-  if(!targetCard) return;
-  const targetId = targetCard.id.replace('card-','');
-  if(targetId === anchorDrag.startId) return;
-  // prevent duplicate edges
-  const exists = Object.values(edges).some(ed => (ed.source === anchorDrag.startId && ed.target === targetId) || (ed.source === targetId && ed.target === anchorDrag.startId));
-  if(exists) { toast('Edge exists'); return; }
-  const newId = randId('e');
-  const edgeObj = { id: newId, source: anchorDrag.startId, target: targetId };
-  edges[newId] = edgeObj;
-  // persist in Firebase edges
-  db.ref('orgchart/edges/'+newId).set(edgeObj);
-  snapshot();
-  renderAll();
-});
+// Search filtering
+document.getElementById("searchBox").oninput = function(){
+  const query = this.value.toLowerCase();
+  cards.forEach(card=>{
+    const el = document.getElementById(card.id);
+    if(!el) return;
+    const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
+    el.style.display = !query || text.includes(query) ? "flex" : "none";
+  });
+  textBoxes.forEach(box=>{
+    const el = document.getElementById(box.id);
+    if(!el) return;
+    const text = (box.content || "").toLowerCase();
+    el.style.display = !query || text.includes(query) ? "block" : "none";
+  });
+};
 
-/* ======================
-   Zoom / Pan
-   ====================== */
-let isPanning = false, panStart = {x:0,y:0}, panOrigin = {tx:0,ty:0};
-stage.addEventListener('pointerdown', e=>{
-  // ignore if starting pointer on card or editor or minimap
-  if(e.target.closest('.card') || e.target.closest('#editPanel') || e.target.closest('#minimap')) return;
+// Zoom
+stage.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomFactor = 1.1;
+  const mousePos = clientToWorld(e.clientX, e.clientY);
+  const oldScale = scale;
+  scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
+  scale = Math.min(Math.max(scale, 0.25), 4);
+  tx = e.clientX - mousePos.x * scale;
+  ty = e.clientY - mousePos.y * scale;
+  applyTransform();
+  updateEdges();
+}, { passive: false });
+
+// Panning
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let panOrigin = { tx: 0, ty: 0 };
+stage.addEventListener('pointerdown', e => {
+  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
   isPanning = true;
-  panStart.x = e.clientX; panStart.y = e.clientY;
-  panOrigin.tx = tx; panOrigin.ty = ty;
+  panStart.x = e.clientX;
+  panStart.y = e.clientY;
+  panOrigin.tx = tx;
+  panOrigin.ty = ty;
   stage.style.cursor = 'grabbing';
   stage.setPointerCapture(e.pointerId);
 });
-stage.addEventListener('pointermove', e=>{
-  if(!isPanning) return;
-  const dx = e.clientX - panStart.x, dy = e.clientY - panStart.y;
-  tx = panOrigin.tx + dx; ty = panOrigin.ty + dy;
+stage.addEventListener('pointermove', e => {
+  if (!isPanning) return;
+  const dx = e.clientX - panStart.x;
+  const dy = e.clientY - panStart.y;
+  tx = panOrigin.tx + dx;
+  ty = panOrigin.ty + dy;
   applyTransform();
   updateEdges();
 });
-stage.addEventListener('pointerup', e=>{
-  if(!isPanning) return;
+stage.addEventListener('pointerup', e => {
+  if (!isPanning) return;
   isPanning = false;
   stage.style.cursor = 'grab';
-  try{ stage.releasePointerCapture(e.pointerId); }catch{}
+  try { stage.releasePointerCapture(e.pointerId); } catch{}
   snapshot();
 });
-stage.addEventListener('pointercancel', e=>{
-  if(!isPanning) return;
+stage.addEventListener('pointercancel', e => {
+  if (!isPanning) return;
   isPanning = false;
   stage.style.cursor = 'grab';
-  try{ stage.releasePointerCapture(e.pointerId); }catch{}
+  try { stage.releasePointerCapture(e.pointerId); } catch{}
   snapshot();
 });
-stage.addEventListener('wheel', e=>{
-  e.preventDefault();
-  const zoomFactor = 1.12;
-  const mouse = clientToWorld(e.clientX, e.clientY);
-  if(e.deltaY < 0) scale *= zoomFactor; else scale /= zoomFactor;
-  scale = Math.max(0.25, Math.min(4, scale));
-  tx = e.clientX - mouse.x * scale;
-  ty = e.clientY - mouse.y * scale;
-  applyTransform();
-  updateEdges();
-}, {passive:false});
 
-/* ======================
-   Minimap that fits whole workspace
-   ====================== */
-function renderMinimapAutoFit(){
-  // compute bounding box of nodes and textBoxes
-  const nodes = Object.values(cards);
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  nodes.forEach(n=>{
-    if(n.x < minX) minX = n.x;
-    if(n.y < minY) minY = n.y;
-    if(n.x > maxX) maxX = n.x;
-    if(n.y > maxY) maxY = n.y;
-  });
-  if(minX === Infinity){ minX = 0; minY = 0; maxX = stage.clientWidth; maxY = stage.clientHeight; }
-  // add padding
-  const pad = 200;
-  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
-  const w = maxX - minX, h = maxY - minY;
-  // svg size
-  const svgW = minimapSVG.clientWidth || 240, svgH = minimapSVG.clientHeight || 160;
-  const scaleMM = Math.min(svgW / w, svgH / h);
-  // clear svg
-  while(minimapSVG.firstChild) minimapSVG.removeChild(minimapSVG.firstChild);
-  // draw edges
-  Object.values(edges).forEach(e=>{
-    const a = cards[e.source], b = cards[e.target];
-    if(!a || !b) return;
-    const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
-    ln.setAttribute('x1', (a.x - minX) * scaleMM);
-    ln.setAttribute('y1', (a.y - minY) * scaleMM);
-    ln.setAttribute('x2', (b.x - minX) * scaleMM);
-    ln.setAttribute('y2', (b.y - minY) * scaleMM);
-    ln.setAttribute('stroke', '#888');
-    ln.setAttribute('stroke-width', 1);
-    minimapSVG.appendChild(ln);
-  });
-  // draw nodes
-  Object.values(cards).forEach(n=>{
-    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    rect.setAttribute('x', (n.x - minX) * scaleMM);
-    rect.setAttribute('y', (n.y - minY) * scaleMM);
-    rect.setAttribute('width', Math.max(6, 36 * Math.min(1, scaleMM)));
-    rect.setAttribute('height', Math.max(4, 20 * Math.min(1, scaleMM)));
-    rect.setAttribute('fill', (n.data && n.data.branchColor) ? n.data.branchColor : '#555');
-    minimapSVG.appendChild(rect);
-  });
-  // viewport rect representing current translated/scale view
-  const viewRect = document.createElementNS('http://www.w3.org/2000/svg','rect');
-  const viewX = (-tx - minX*scale) / scale;
-  const viewY = (-ty - minY*scale) / scale;
-  // But simpler: compute world coords of viewport corners
-  const worldTopLeft = { x: (-tx) / scale, y: (-ty) / scale };
-  const worldBottomRight = { x: (window.innerWidth - tx) / scale, y: (window.innerHeight - ty) / scale };
-  const vx = (worldTopLeft.x - minX) * scaleMM;
-  const vy = (worldTopLeft.y - minY) * scaleMM;
-  const vw = (worldBottomRight.x - worldTopLeft.x) * scaleMM;
-  const vh = (worldBottomRight.y - worldTopLeft.y) * scaleMM;
-  viewRect.setAttribute('x', vx);
-  viewRect.setAttribute('y', vy);
-  viewRect.setAttribute('width', Math.max(1, vw));
-  viewRect.setAttribute('height', Math.max(1, vh));
-  viewRect.setAttribute('stroke', '#0f0');
-  viewRect.setAttribute('stroke-width', 1.5);
-  viewRect.setAttribute('fill', 'none');
-  minimapSVG.appendChild(viewRect);
-}
+/* ---------- Anchor linking (create edges) ---------- */
+let anchorDrag = { active:false, startCardId:null, tmpLine:null };
+stage.addEventListener('pointerdown', e => {
+  // Start anchor drag when user presses on an anchor
+  if (e.target.classList.contains('anchor')) {
+    const cardEl = e.target.closest('.card');
+    if (!cardEl) return;
+    anchorDrag.active = true;
+    anchorDrag.startCardId = cardEl.id;
 
-/* minimap click to pan */
-minimapSVG.addEventListener('click', e=>{
-  const rect = minimapSVG.getBoundingClientRect();
-  const clickX = e.clientX - rect.left, clickY = e.clientY - rect.top;
-  // reconstruct minX/minY/w/h as above
-  const nodes = Object.values(cards);
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  nodes.forEach(n=>{ if(n.x < minX) minX = n.x; if(n.y < minY) minY = n.y; if(n.x > maxX) maxX = n.x; if(n.y > maxY) maxY = n.y; });
-  if(minX === Infinity){ minX = 0; minY = 0; maxX = stage.clientWidth; maxY = stage.clientHeight; }
-  const pad=200; minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
-  const w = maxX - minX, h = maxY - minY;
-  const svgW = rect.width, svgH = rect.height;
-  const scaleMM = Math.min(svgW / w, svgH / h);
-  const worldX = minX + clickX / scaleMM;
-  const worldY = minY + clickY / scaleMM;
-  // center viewport on worldX/worldY
-  tx = window.innerWidth/2 - worldX*scale;
-  ty = window.innerHeight/2 - worldY*scale;
-  applyTransform(); updateEdges(); renderMinimapAutoFit();
-});
+    const svgNS = "http://www.w3.org/2000/svg";
+    anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffd54f');
+    anchorDrag.tmpLine.setAttribute('stroke-width', '3');
+    anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
+    wiresLayer.appendChild(anchorDrag.tmpLine);
 
-/* ======================
-   Firebase: load orgchart nodes/edges listener
-   ====================== */
-function listenOrgchart(){
-  db.ref('orgchart').on('value', snapshot=>{
-    const v = snapshot.val() || {};
-    // load nodes
-    cards = {};
-    if(v.nodes){
-      Object.keys(v.nodes).forEach(k=>{
-        cards[k] = v.nodes[k];
-      });
+    const startPos = anchorCenter(anchorDrag.startCardId);
+    if (startPos) {
+      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
+      anchorDrag.tmpLine.setAttribute('x2', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y2', startPos.y);
     }
-    // load edges
-    edges = {};
-    if(v.edges){
-      Object.keys(v.edges).forEach(k=>{
-        edges[k] = v.edges[k];
-      });
-    }
-    renderAll();
-  });
-}
-
-/* initial call */
-listenOrgchart();
-
-/* ======================
-   Workspace Save / Load / Delete
-   saved under 'connectionWebs/<name>' with structure { cards, edges, tx, ty, scale }
-   ====================== */
-async function refreshWorkspaceList(){
-  try{
-    const snap = await db.ref('connectionWebs').once('value');
-    const val = snap.val() || {};
-    webListDropdown.innerHTML = '';
-    Object.keys(val).sort().forEach(k=>{
-      const opt = document.createElement('option'); opt.value = k; opt.textContent = k; webListDropdown.appendChild(opt);
-    });
-    const last = localStorage.getItem('lastWeb');
-    if(last && val[last]){ webListDropdown.value = last; webNameInput.value = last; subscribeToWorkspace(last); }
-  }catch(err){ console.error('refreshWorkspaceList', err); }
-}
-
-async function saveWorkspace(){
-  const name = webNameInput.value.trim();
-  if(!name){ alert('Enter a workspace name'); return; }
-  // copy objects
-  const payload = { cards, edges, tx, ty, scale, updatedAt: Date.now() };
-  try{
-    await db.ref('connectionWebs/'+name).set(payload);
-    toast('Saved workspace: '+name);
-    await refreshWorkspaceList();
-    localStorage.setItem('lastWeb', name);
-  }catch(err){ alert('Save failed: '+err.message); }
-}
-
-function subscribeToWorkspace(name){
-  if(!name) return;
-  if(window.currentWorkspaceListener){
-    db.ref('connectionWebs/'+window.currentWorkspaceName).off('value', window.currentWorkspaceListener);
-    window.currentWorkspaceListener = null; window.currentWorkspaceName = null;
+    try { e.target.setPointerCapture(e.pointerId); } catch {}
   }
-  const ref = db.ref('connectionWebs/'+name);
-  window.currentWorkspaceListener = ref.on('value', snap=>{
-    const data = snap.val();
-    if(!data){ toast('No data for '+name); return; }
-    cards = data.cards || {};
-    edges = data.edges || {};
-    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
-    applyTransform(); renderAll();
-    toast('Loaded workspace: '+name);
-  }, err => {
-    alert('Sync failed: '+err.message);
-  });
-  window.currentWorkspaceName = name;
-}
+});
 
-async function loadWorkspace(){
-  const name = webNameInput.value.trim() || webListDropdown.value;
-  if(!name){ alert('Select a workspace to load'); return; }
-  subscribeToWorkspace(name);
-  localStorage.setItem('lastWeb', name);
-}
+stage.addEventListener('pointermove', e => {
+  if (!anchorDrag.active) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  if (anchorDrag.tmpLine) {
+    anchorDrag.tmpLine.setAttribute('x2', pos.x);
+    anchorDrag.tmpLine.setAttribute('y2', pos.y);
+  }
+});
 
-async function deleteWorkspace(){
-  const name = webListDropdown.value || webNameInput.value.trim();
-  if(!name){ alert('Select a workspace to delete'); return; }
-  const confirmText = prompt(`Type DELETE to confirm deletion of "${name}"`);
-  if(confirmText !== 'DELETE'){ alert('Deletion canceled'); return; }
-  try{
-    if(window.currentWorkspaceListener && window.currentWorkspaceName === name){
-      db.ref('connectionWebs/'+name).off('value', window.currentWorkspaceListener);
-      window.currentWorkspaceListener = null; window.currentWorkspaceName = null;
+stage.addEventListener('pointerup', e => {
+  if (!anchorDrag.active) return;
+  anchorDrag.active = false;
+
+  let targetCard = null;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if(el) {
+    const cardEl = el.closest('.card');
+    if(cardEl) targetCard = cardEl.id;
+  }
+
+  if (!targetCard || targetCard === anchorDrag.startCardId) {
+    if (anchorDrag.tmpLine) {
+      anchorDrag.tmpLine.remove();
+      anchorDrag.tmpLine = null;
     }
-    await db.ref('connectionWebs/'+name).remove();
-    toast('Deleted workspace: '+name);
-    await refreshWorkspaceList();
-  }catch(err){ alert('Delete failed: '+err.message); }
-}
+    try { e.target.releasePointerCapture(e.pointerId); } catch {}
+    return;
+  }
 
-/* wire workspace buttons */
-document.getElementById('saveWebBtn').addEventListener('click', saveWorkspace);
-document.getElementById('loadWebBtn').addEventListener('click', loadWorkspace);
-document.getElementById('deleteWebBtn').addEventListener('click', deleteWorkspace);
-document.getElementById('webListDropdown').addEventListener('change', e => { const v = e.target.value; if(v){ webNameInput.value = v; localStorage.setItem('lastWeb', v); } });
+  // Prevent duplicate edges
+  if (!edges.some(edge =>
+    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
+    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
+  )) {
+    const newEdge = {
+      id: "e" + Math.random().toString(36).slice(2,9),
+      a: { card: anchorDrag.startCardId },
+      b: { card: targetCard }
+    };
+    edges.push(newEdge);
+    updateEdges();
+    snapshot();
+    render();
+  }
 
-/* on load, refresh workspace list */
-refreshWorkspaceList();
-
-/* ======================
-   populate faction/rank selects in editor
-   ====================== */
-function populateFactionSelect(selected){
-  const sel = document.getElementById('fFaction');
-  sel.innerHTML = '';
-  factions.forEach(f=>{
-    const opt = document.createElement('option');
-    opt.value = f; opt.textContent = f;
-    if(f === selected) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
-function populateRanks(faction, selected){
-  const sel = document.getElementById('fRank');
-  sel.innerHTML = '';
-  (rankLists[faction] || ['None']).forEach(r=>{
-    const opt = document.createElement('option');
-    opt.value = r; opt.textContent = r;
-    if(r === selected) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-document.getElementById('fFaction').addEventListener('change', e => populateRanks(e.target.value, null));
-
-/* ======================
-   Search box
-   ====================== */
-document.getElementById('searchBox').addEventListener('input', e=>{
-  const q = e.target.value.trim().toLowerCase();
-  Object.values(cards).forEach(n=>{
-    const el = document.getElementById('card-'+n.id);
-    if(!el) return;
-    const text = ((n.data && (n.data.name + ' ' + n.data.faction + ' ' + (n.data.rank||''))) || (n.data && n.data.name) || '').toLowerCase();
-    el.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
-  });
+  if (anchorDrag.tmpLine) {
+    anchorDrag.tmpLine.remove();
+    anchorDrag.tmpLine = null;
+  }
+  try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
 
-/* ======================
-   Keyboard shortcuts
-   ====================== */
-window.addEventListener('keydown', e=>{
-  if((e.ctrlKey || e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); }
-  if((e.ctrlKey || e.metaKey) && e.key === 'y'){ e.preventDefault(); redo(); }
-  if(e.key === 'Delete' || e.key === 'Backspace'){ if(selectedId) document.getElementById('deleteSelectedBtn').click(); }
+/* ---------- Deselect on stage click ---------- */
+stage.addEventListener("click", e=>{
+  if(e.target === stage || e.target === viewport){
+    if(selected){
+      const el = document.getElementById(selected);
+      if(el) el.classList.remove("selected");
+      selected = null; selectedType = null; closeEditor();
+    }
+  }
 });
 
-/* ======================
-   Realtime: sync individual node/edge changes from firebase to local (optional)
-   This app listens to 'orgchart' root once above; to keep both in sync we write when we change.
-   ====================== */
+/* ---------- Firebase: save/load/delete & web list ---------- */
+const webNameInput = document.getElementById('webNameInput');
+const webListDropdown = document.getElementById('webListDropdown');
+let currentWebListener = null;
 
-/* ======================
-   Initial setup: load orgchart once, and render
-   ====================== */
-function init(){
-  // initial render
-  renderAll();
-  // last web
-  const last = localStorage.getItem('lastWeb');
-  if(last) { webNameInput.value = last; }
-  // keyboard friendly focus
-  document.getElementById('addProfileBtn').focus();
+async function subscribeToWeb(name) {
+  if (currentWebListener) {
+    if(webListDropdown.value) {
+      db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+    }
+    currentWebListener = null;
+  }
+  if(!name) return;
+  const ref = db.ref(`connectionWebs/${name}`);
+  currentWebListener = ref.on('value', snapshot => {
+    const data = snapshot.val();
+    if (!data) {
+      toast(`No data found for "${name}"`);
+      cards = []; edges = []; textBoxes = [];
+      tx = 0; ty = 0; scale = 1;
+      render();
+      return;
+    }
+    // Restore saved state
+    cards.splice(0, cards.length, ...(data.cards || []));
+    edges.splice(0, edges.length, ...(data.edges || []));
+    textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
+    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
+    applyTransform();
+    render();
+    toast(`Synced with "${name}"`);
+  }, error => { alert("Realtime sync failed: " + error.message); });
 }
-init();
 
-/* Expose for debugging */
-window.__cw = { cards, edges, textBoxes, renderAll, snapshot, undo, redo, saveWorkspace, loadWorkspace, refreshWorkspaceList };
+webListDropdown.addEventListener("change", (e) => {
+  const name = e.target.value;
+  if (!name) return;
+  localStorage.setItem("lastWeb", name);
+  webNameInput.value = name;
+  subscribeToWeb(name);
+});
+webNameInput.addEventListener("change", (e) => {
+  const name = e.target.value.trim();
+  if (!name) return;
+  localStorage.setItem("lastWeb", name);
+  subscribeToWeb(name);
+  if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    webListDropdown.appendChild(opt);
+    webListDropdown.value = name;
+  }
+});
 
+async function saveCurrentWeb() {
+  const name = webNameInput.value.trim();
+  if (!name) { alert("Enter a Connection Web name"); return; }
+  // Deep-clone to strip any DOM references
+  const data = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() }));
+  try { await db.ref(`connectionWebs/${name}`).set(data); toast("Connection Web saved!"); }
+  catch (e) { alert("Save failed: " + e.message); }
+}
+async function deleteCurrentWeb() {
+  const name = webListDropdown.value;
+  if (!name) { alert("Select a Connection Web to delete"); return; }
+  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
+  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
+  try {
+    if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
+    await db.ref(`connectionWebs/${name}`).remove();
+    toast("Connection Web deleted");
+    await refreshWebList();
+  } catch (e) { alert("Delete failed: " + e.message); }
+}
+async function refreshWebList() {
+  try {
+    const snapshot = await db.ref('connectionWebs').once('value');
+    const data = snapshot.val() || {};
+    webListDropdown.innerHTML = "";
+    Object.keys(data).sort().forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name; opt.textContent = name;
+      webListDropdown.appendChild(opt);
+    });
+    let last = localStorage.getItem("lastWeb");
+    if (last && data[last]) {
+      webListDropdown.value = last;
+      webNameInput.value = last;
+      subscribeToWeb(last);
+    }
+  } catch (e) { console.error("Failed to load Connection Webs list:", e); }
+}
+document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
+document.getElementById("loadWebBtn").onclick = () => {
+  const name = webListDropdown.value || webNameInput.value.trim();
+  if(!name) { alert("Pick or type a web name to load"); return; }
+  subscribeToWeb(name);
+};
+document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
+
+/* ---------- Misc ---------- */
+// Deselect on background / stage click (extra)
+document.addEventListener("click", (e) => {
+  if (e.target.closest('#toolbar') || e.target.closest('#editor')) return;
+}, false);
+
+// Initialize
+document.addEventListener("DOMContentLoaded", ()=>{
+  refreshWebList();
+  render();
+  // initial snapshot
+  snapshot();
+});
+
+// Keyboard shortcuts: Ctrl+Z / Ctrl+Y
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
+});
 </script>
 </body>
 </html>
