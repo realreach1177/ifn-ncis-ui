@@ -339,29 +339,12 @@ function makeTextBoxView(box) {
   t.style.minHeight = '50px';
   t.style.width = box.width ? box.width + 'px' : '300px';
 
-  // Prevent event bubbling to stage/card while interacting with text
-  t.addEventListener('pointerdown', e => {
-    e.stopPropagation(); // *** Important: Stop propagation so drag does not affect cards or stage ***
-    dragging = true;
-    t.classList.add('dragging');
-    t.setPointerCapture(e.pointerId);
-    const wp = clientToWorld(e.clientX, e.clientY);
-    offset.x = wp.x - box.x;
-    offset.y = wp.y - box.y;
-  });
-  t.addEventListener('pointermove', e => {
-    if(!dragging || !(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
-    const wp = clientToWorld(e.clientX, e.clientY);
-    box.x = snapToGrid(wp.x - offset.x);
-    box.y = snapToGrid(wp.y - offset.y);
-    t.style.left = box.x + 'px';
-    t.style.top = box.y + 'px';
-   function renderMinimap(){
+ // Define renderMinimap function outside event listeners
+function renderMinimap() {
   minimapSVG.innerHTML = "";
   const minimapWidth = 220;
   const minimapHeight = 150;
-  
-  // Calculate bounding box of all elements
+
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   cards.forEach(c => {
     minX = Math.min(minX, c.x);
@@ -375,16 +358,13 @@ function makeTextBoxView(box) {
     maxX = Math.max(maxX, t.x + (t.width || 300));
     maxY = Math.max(maxY, t.y + 60);
   });
-
-  // Fallback if no items to avoid infinity
+  
   if (minX === Infinity) {
     minX = 0; minY = 0; maxX = 1000; maxY = 800;
   }
 
   const workspaceWidth = maxX - minX;
   const workspaceHeight = maxY - minY;
-
-  // Scale to fit all inside minimap box keeping aspect ratio
   const scaleX = minimapWidth / workspaceWidth;
   const scaleY = minimapHeight / workspaceHeight;
   const scale = Math.min(scaleX, scaleY);
@@ -395,10 +375,11 @@ function makeTextBoxView(box) {
     rect.setAttribute("y", (c.y - minY) * scale);
     rect.setAttribute("width", 360 * scale);
     rect.setAttribute("height", 120 * scale);
-    rect.setAttribute("fill", (c.data.branchColor||"#777"));
+    rect.setAttribute("fill", (c.data.branchColor || "#777"));
     rect.setAttribute("fill-opacity", "0.9");
     minimapSVG.appendChild(rect);
   });
+
   textBoxes.forEach(t => {
     const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
     rect.setAttribute("x", (t.x - minX) * scale);
@@ -411,16 +392,53 @@ function makeTextBoxView(box) {
   });
 }
 
+function makeTextBoxView(box) {
+  const t = document.createElement('div');
+  t.className = 'textbox';
+  t.id = box.id;
+  t.style.left = box.x + 'px';
+  t.style.top = box.y + 'px';
+  t.textContent = box.content || "";
+  t.contentEditable = true;
+  t.spellcheck = false;
+  t.style.minHeight = '50px';
+  t.style.width = box.width ? box.width + 'px' : '300px';
+
+  // Local dragging state
+  let dragging = false;
+  let offset = { x: 0, y: 0 };
+
+  t.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    dragging = true;
+    t.classList.add('dragging');
+    t.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - box.x;
+    offset.y = wp.y - box.y;
+  });
+
+  t.addEventListener('pointermove', e => {
+    if(!dragging || !(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    box.x = snapToGrid(wp.x - offset.x);
+    box.y = snapToGrid(wp.y - offset.y);
+    t.style.left = box.x + 'px';
+    t.style.top = box.y + 'px';
+    renderMinimap();
+  });
+
   t.addEventListener('pointerup', e => {
     dragging = false;
     t.classList.remove('dragging');
-    try { t.releasePointerCapture(e.pointerId); } catch{}
+    try { t.releasePointerCapture(e.pointerId); } catch {}
     snapshot();
   });
+
   t.addEventListener('pointercancel', e => {
     dragging = false;
     t.classList.remove('dragging');
-    try { t.releasePointerCapture(e.pointerId); } catch{}
+    try { t.releasePointerCapture(e.pointerId); } catch {}
   });
 
   t.addEventListener('input', e => {
@@ -433,60 +451,18 @@ function makeTextBoxView(box) {
 
   t.addEventListener('click', e => {
     e.stopPropagation();
-    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
-    selected = box.id; selectedType = 'textbox'; t.classList.add('selected');
+    if(selected){ 
+      const prev = document.getElementById(selected); 
+      if(prev) prev.classList.remove('selected'); 
+    }
+    selected = box.id;
+    selectedType = 'textbox';
+    t.classList.add('selected');
     openEditor(box.id, 'textbox');
   });
 
-  // Define dragging state variables for textboxes separately
-  let dragging = false;
-  let offset = {x:0,y:0};
-
   cardsLayer.appendChild(t);
   return t;
-}
-
-function makeEdgeView(edge) {
-  const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  ln.setAttribute("stroke", "#fff");
-  ln.setAttribute("stroke-opacity", "0.95");
-  ln.setAttribute("stroke-width", "3");
-  ln.dataset.eid = edge.id;
-  wiresLayer.appendChild(ln);
-  return ln;
-}
-
-function anchorCenter(cardId) {
-  const cardEl = document.getElementById(cardId);
-  if (!cardEl) return null;
-  const anchor = cardEl.querySelector(".anchor");
-  if (!anchor) return null;
-  const rect = anchor.getBoundingClientRect();
-  const stageRect = stage.getBoundingClientRect();
-  return { x: (rect.left + rect.width / 2 - stageRect.left - tx) / scale, y: (rect.top + rect.height / 2 - stageRect.top - ty) / scale };
-}
-function updateEdge(edge) {
-  const start = anchorCenter(edge.a.card);
-  const end = anchorCenter(edge.b.card);
-  if (!start || !end) return;
-  const line = wiresLayer.querySelector(`line[data-eid="${edge.id}"]`);
-  if (!line) return;
-  line.setAttribute("x1", start.x);
-  line.setAttribute("y1", start.y);
-  line.setAttribute("x2", end.x);
-  line.setAttribute("y2", end.y);
-}
-function updateEdges() { edges.forEach(updateEdge); }
-
-function render() {
-  cardsLayer.innerHTML = '';
-  wiresLayer.innerHTML = '';
-  cards.forEach(makeCardView);
-  textBoxes.forEach(makeTextBoxView);
-  edges.forEach(makeEdgeView);
-  updateEdges();
-  applyTransform();
-  renderMinimap();
 }
 
 // Snapshots and undo/redo store/load
