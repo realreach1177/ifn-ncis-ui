@@ -2,159 +2,50 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Connection Web UI - Full with Links, TextBoxes & Clean UI</title>
+<title>OrgChart Connection Web — Merged</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-html, body {
-  height:100%; margin:0; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden;
-}
-#ui {
-  position: fixed;
-  top: 8px; left: 8px; right: 8px;
-  z-index: 200000;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-width: calc(100vw - 16px);
-  user-select: none;
-  align-items: center;
-  justify-content: space-between;
-  padding-right: 10px;
-}
-#left-tools, #right-tools {
-  display: flex; gap:6px; align-items: center;
-}
-#ui > * {
-  padding:6px 10px; border:none; border-radius:6px;
-  font-weight:600; cursor:pointer; font-size:14px; color:white;
-  min-width:48px; text-align:center;
-}
-#ui button {
-  background: #444f5a;
-  color: #e0e0e0;
-  font-weight: 600;
-  border-radius: 6px;
-  border: none;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
-  min-width: 64px;
-}
-#ui button:hover, #ui button:focus {
-  background-color: #5a6673;
-  box-shadow: 0 0 10px rgba(90, 102, 115, 0.6);
-  outline: none;
-}
-#undoBtn {
-  background-color: #6a7c85;
-}
-#undoBtn:hover, #undoBtn:focus {
-  background-color: #7f929b;
-  box-shadow: 0 0 14px rgba(127, 146, 155, 0.7);
-}
-#redoBtn {
-  background-color: #6a7c85;
-}
-#redoBtn:hover, #redoBtn:focus {
-  background-color: #7f929b;
-  box-shadow: 0 0 14px rgba(127, 146, 155, 0.7);
-}
-#saveWebBtn {
-  background-color: #4b8a8a;
-}
-#saveWebBtn:hover, #saveWebBtn:focus {
-  background-color: #609b9b;
-  box-shadow: 0 0 14px rgba(96, 155, 155, 0.7);
-}
-#deleteWebBtn {
-  background-color: #8a4b4b;
-}
-#deleteWebBtn:hover, #deleteWebBtn:focus {
-  background-color: #9b6060;
-  box-shadow: 0 0 14px rgba(155, 96, 96, 0.7);
-}
-#deleteCardBtn {
-  background-color: #7a5f5f;
-}
-#deleteCardBtn:hover, #deleteCardBtn:focus {
-  background-color: #8c7070;
-  box-shadow: 0 0 14px rgba(140, 112, 112, 0.7);
-}
-#addTextBoxBtn {
-  background-color: #5a758e;
-}
-#addTextBoxBtn:hover, #addTextBoxBtn:focus {
-  background-color: #7090ad;
-  box-shadow: 0 0 14px rgba(112, 144, 173, 0.7);
-}
-#ui input[type="text"], #ui select {
-  background: #2c333a;
-  border-radius: 6px;
-  border: none;
-  color: #cfd8dc;
-  font-weight: 600;
-  font-size: 14px;
-  padding: 6px 12px;
-  min-width: 150px;
-  max-width: 250px;
-  transition: background-color 0.3s ease;
-}
-#ui input[type="text"]::placeholder {
-  color: #78909c;
-}
-#ui input[type="text"]:focus, #ui select:focus {
-  background-color: #3a424d;
-  outline: none;
-  box-shadow: 0 0 8px rgba(60, 90, 105, 0.6);
-}
-#searchBox {
-  min-width:200px;
-}
-#stage {
-  position:absolute; inset:0; background:#141414; cursor:grab;
+html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden; }
+/* Toolbar (merged) */
+#toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
+.toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
+#toolbar button, #toolbar input, #toolbar select { border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer; font-size:14px; }
+#toolbar button { background:#333; color:#eee; transition: background-color 0.25s ease, box-shadow 0.25s ease; }
+#toolbar button:hover { background:#3f3f3f; box-shadow:0 0 10px rgba(255,255,255,0.08); }
+#saveWebBtn { background:#2e7d32; color:#fff; }
+#loadWebBtn { background:#1565c0; color:#fff; }
+#deleteWebBtn { background:#c62828; color:#fff; }
+#webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
+/* Stage and layers */
+#stage { position:absolute; inset:0; overflow:hidden; background:#141414; cursor:grab;
   background-image:
     linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
   background-size:40px 40px;
 }
-#viewport {
-  position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0;
-  overflow: visible;
-}
-#wires {
-  position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1;
-}
-#cards {
-  position:absolute; left:0; top:0; width:100%; height:100%;
-}
+#viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
+#wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1; }
+#cards { position:absolute; left:0; top:0; width:100%; height:100%; }
+/* Cards and textboxes */
 .card, .textbox {
   position:absolute; padding:15px 20px; box-sizing:border-box;
   background:#222; color:#e0e0e0; border-radius:10px;
   user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
   overflow-wrap: break-word;
 }
-.card {
-  width:360px; display:flex; align-items:flex-start;
-}
+.card { width:360px; display:flex; align-items:flex-start; }
 .textbox {
   width:300px; min-height:50px; resize: both; overflow:auto;
   font-size: 14px;
   font-family: system-ui, Segoe UI, Tahoma, Arial;
-  cursor: grab;
 }
 .card.dragging, .textbox.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50);}
-.card.selected, .textbox.selected {
-  outline:3px solid var(--selectedHighlightColor, #ffc107);
-  box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107);
-}
-.img {
-  width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:18px;
-  border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6);
-}
+.card.selected, .textbox.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
+.img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:18px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
 .info { flex:1; overflow:hidden; }
 .name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
 .rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
@@ -164,78 +55,73 @@ html, body {
 .alive { background:#4caf50; }
 .dead { background:#e53935; }
 .unknown { background:#212121; border:1.5px solid #78909c; }
-.anchor {
-  position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333;
-  top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20;
-}
+.anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20; }
 .anchor.candidate { background:#66bb6a; }
-#editor {
-  position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
-  box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto;
-}
-#editor header {
-  font-weight:900; font-size:18px; padding-bottom:12px;
-}
-#editor label {
-  font-size:12px; margin-top:10px; display:block; color:#bbb;
-}
+/* Editor side panel */
+#editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
+  box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
+#editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
+#editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
 #editor input, #editor select, #editor textarea {
-  width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px;
-  font-size:14px;
+  width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px;
 }
 #editor textarea { min-height:60px; }
-#editor .btns {
-  margin-top:14px; display:flex; gap:10px;
-}
-#editor .btns button {
-  flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px;
-  background:#2196f3; color:#fff; transition: background 0.3s;
-}
+#editor .btns { margin-top:14px; display:flex; gap:10px; }
+#editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
 #editor .btns button:hover { background:#1769aa; }
 #editor .btns button.save { background:#4caf50; }
 #editor .btns button.save:hover { background:#388e3c; }
-.file-list {
-  max-height:100px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px;
-}
-.file-list a {
-  color:#74b9ff; text-decoration:none;
-}
-.file-list a:hover {
-  text-decoration:underline;
-}
-.toast {
-  position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
-  box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.9; user-select:none; z-index:999999;
-  pointer-events:none;
-}
+.file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
+.file-list a { color:#74b9ff; text-decoration:none; }
+.file-list a:hover { text-decoration:underline; }
+/* Toasts */
+.toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
+  box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
+/* Minimap */
+#minimap { position:absolute; right:12px; bottom:12px; width:220px; height:150px; background:#1a1a1a; border:2px solid #444; border-radius:8px; overflow:hidden; z-index:5000; }
+#minimapSVG { width:100%; height:100%; }
 </style>
 </head>
 <body>
-<div id="ui">
-  <div id="left-tools">
+<!-- Toolbar -->
+<div id="toolbar">
+  <div class="toolbar-left">
+    <button id="addProfileBtn" title="Add Profile Card">Add Profile</button>
+    <button id="addTextBtn" title="Add Text Box">Add Text</button>
+    <button id="deleteSelectedBtn" title="Delete Selected">Delete</button>
     <button id="undoBtn" title="Undo">Undo</button>
     <button id="redoBtn" title="Redo">Redo</button>
-    <button id="deleteCardBtn" title="Delete Selected Card">Delete Card</button>
-    <button id="addTextBoxBtn" title="Add Text Box">Add Text Box</button>
-  </div>
-  <div id="right-tools">
-    <button id="saveWebBtn" title="Save Connection Web">Save Web</button>
-    <button id="deleteWebBtn" title="Delete Connection Web">Delete Web</button>
-    <select id="webListDropdown" title="Select Connection Web"></select>
-    <input type="text" id="webNameInput" placeholder="Enter Connection Web Name" />
     <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
   </div>
+  <div class="toolbar-right">
+    <input type="text" id="webNameInput" placeholder="Web Name" />
+    <select id="webListDropdown" title="Select Connection Web"></select>
+    <button id="saveWebBtn" title="Save Connection Web">Save</button>
+    <button id="loadWebBtn" title="Load Connection Web">Load</button>
+    <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
+  </div>
 </div>
+
+<!-- Stage -->
 <div id="stage">
   <div id="viewport">
     <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
     <div id="cards"></div>
   </div>
 </div>
+
+<!-- Minimap -->
+<div id="minimap"><svg id="minimapSVG"></svg></div>
+
+<!-- Editor -->
 <div id="editor">
-  <header>Edit Profile</header>
+  <header>Edit Item</header>
   <label>Profile Picture URL</label>
   <input id="fImage" type="url" placeholder="https://..." />
+  <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+    <input id="fImageFile" type="file" accept="image/*" />
+    <button id="btnUseLocalImage" type="button">Use File</button>
+  </div>
   <label>Name</label>
   <input id="fName" type="text" />
   <label>Status</label>
@@ -252,26 +138,35 @@ html, body {
   <select id="fRank"></select>
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
-  
-  <label>Related Files from Firebase</label>
+
+  <label>Related Files (external URL)</label>
   <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" />
   <input id="fRelatedName" type="text" placeholder="Display name for hyperlink" />
-  <button id="btnAddRelated" type="button">Add</button>
-  <div id="relatedList" class="file-list"></div>
-  
-  <label>Other Files (URL)</label>
+  <div style="display:flex; gap:8px; margin-top:6px;">
+    <button id="btnAddRelated" type="button">Add URL</button>
+    <input id="fRelatedFile" type="file" />
+    <button id="btnAddRelatedFile" type="button">Add File</button>
+  </div>
+  <div id="relatedList" class="file-list">(none)</div>
+
+  <label>Other Files (external URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
   <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
-  <button id="btnAddOther" type="button">Add</button>
-  <div id="otherList" class="file-list"></div>
-  
+  <div style="display:flex; gap:8px; margin-top:6px;">
+    <button id="btnAddOther" type="button">Add URL</button>
+    <input id="fOtherFile" type="file" />
+    <button id="btnAddOtherFile" type="button">Add File</button>
+  </div>
+  <div id="otherList" class="file-list">(none)</div>
+
   <div class="btns">
     <button class="save" id="btnSave" type="button">Save</button>
     <button id="btnCancel" type="button">Cancel</button>
   </div>
 </div>
+
 <script>
-// Firebase config — Replace with your Firebase project config!
+// Firebase config — replace with your Firebase project config if different.
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -279,7 +174,7 @@ const firebaseConfig = {
   projectId: "ncis-intranet",
   storageBucket: "ncis-intranet.firebasestorage.app",
   messagingSenderId: "1010993365309",
-  appId: "1:1010993365309:web:8c72db8c5d95c061adc554",
+  appId: "1:1010993365309:c72db8c5d95c061adc554",
   measurementId: "G-GLMXRGGSHX"
 };
 firebase.initializeApp(firebaseConfig);
@@ -287,7 +182,7 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// App state and constants
+// App state
 let cards = [];
 let edges = [];
 let textBoxes = [];
@@ -296,11 +191,14 @@ let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
+let snap = 10; // snapping grid in px
 
+// DOM
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
 const cardsLayer = document.getElementById('cards');
 const wiresLayer = document.getElementById('wires');
+const minimapSVG = document.getElementById('minimapSVG');
 
 const branchColors = {
   "None": "#777777",
@@ -323,7 +221,7 @@ const rankLists = {
   "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"]
 };
 
-// Helper functions
+// Helpers
 function contrast(hex) {
   hex = (hex || '').replace('#', '');
   if (hex.length !== 6) return '#000';
@@ -332,24 +230,16 @@ function contrast(hex) {
 }
 function fileNameFromUrl(url) {
   if(typeof url !== 'string') return '';
-  try {
-    let p = new URL(url).pathname;
-    return p.substring(p.lastIndexOf('/') + 1);
-  } catch {
-    return url.split('/').pop() || '';
-  }
+  try { let p = new URL(url).pathname; return p.substring(p.lastIndexOf('/') + 1); }
+  catch { return url.split('/').pop() || ''; }
 }
 function toast(msg){
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(() => {
-    t.style.opacity = '0';
-    setTimeout(() => t.remove(), 300);
-  }, 1500);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
 }
-
 function applyTransform(){
   viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
@@ -358,7 +248,12 @@ function clientToWorld(cx, cy){
   const sx=cx-r.left, sy=cy-r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
-// --- CARD RENDERER ---
+function snapToGrid(v){ return Math.round(v / snap) * snap; }
+
+// --- RENDERERS ---
+function linkListHTML(files) {
+  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+}
 function makeCardView(card) {
   const c = document.createElement('div');
   c.className = 'card';
@@ -369,9 +264,7 @@ function makeCardView(card) {
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
-  function linkListHTML(files) {
-    return files.map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
-  }
+
   c.innerHTML = `
     <img class="img" src="${d.image}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
@@ -381,22 +274,20 @@ function makeCardView(card) {
       <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
       <div class="desc">${d.desc || ''}</div>
       <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
-        ${linkListHTML(d.relatedFiles || [])}${linkListHTML(d.otherFiles || [])}
+        ${linkListHTML(d.relatedFiles)}${linkListHTML(d.otherFiles)}
       </ul>
     </div>
     <div class="anchor" title="Drag to link"></div>
   `;
+
   c.addEventListener('click', e => {
     e.stopPropagation();
-    if(selected) {
-      const prev = document.getElementById(selected);
-      if(prev) prev.classList.remove('selected');
-    }
-    selected = card.id;
-    selectedType = 'card';
-    c.classList.add('selected');
+    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    selected = card.id; selectedType = 'card'; c.classList.add('selected');
     openEditor(card.id, 'card');
   });
+
+  // Dragging
   let dragging = false;
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
@@ -411,27 +302,28 @@ function makeCardView(card) {
   c.addEventListener('pointermove', e => {
     if(!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
-    card.x = wp.x - offset.x;
-    card.y = wp.y - offset.y;
+    card.x = snapToGrid(wp.x - offset.x);
+    card.y = snapToGrid(wp.y - offset.y);
     c.style.left = card.x + 'px';
     c.style.top = card.y + 'px';
     updateEdges();
+    renderMinimap();
   });
   c.addEventListener('pointerup', e => {
     dragging = false;
     c.classList.remove('dragging');
-    c.releasePointerCapture(e.pointerId);
+    try { c.releasePointerCapture(e.pointerId); } catch{}
     snapshot();
   });
   c.addEventListener('pointercancel', e => {
     dragging = false;
     c.classList.remove('dragging');
-    c.releasePointerCapture(e.pointerId);
+    try { c.releasePointerCapture(e.pointerId); } catch{}
   });
+
   cardsLayer.appendChild(c);
   return c;
 }
-// --- TEXTBOX RENDERER ---
 function makeTextBoxView(box) {
   const t = document.createElement('div');
   t.className = 'textbox';
@@ -446,13 +338,8 @@ function makeTextBoxView(box) {
 
   t.addEventListener('click', e => {
     e.stopPropagation();
-    if(selected) {
-      const prev = document.getElementById(selected);
-      if(prev) prev.classList.remove('selected');
-    }
-    selected = box.id;
-    selectedType = 'textbox';
-    t.classList.add('selected');
+    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    selected = box.id; selectedType = 'textbox'; t.classList.add('selected');
     openEditor(box.id, 'textbox');
   });
 
@@ -470,32 +357,30 @@ function makeTextBoxView(box) {
   t.addEventListener('pointermove', e => {
     if(!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
-    box.x = wp.x - offset.x;
-    box.y = wp.y - offset.y;
+    box.x = snapToGrid(wp.x - offset.x);
+    box.y = snapToGrid(wp.y - offset.y);
     t.style.left = box.x + 'px';
     t.style.top = box.y + 'px';
+    renderMinimap();
   });
   t.addEventListener('pointerup', e => {
     dragging = false;
     t.classList.remove('dragging');
-    t.releasePointerCapture(e.pointerId);
+    try { t.releasePointerCapture(e.pointerId); } catch{}
     snapshot();
   });
   t.addEventListener('pointercancel', e => {
     dragging = false;
     t.classList.remove('dragging');
-    t.releasePointerCapture(e.pointerId);
+    try { t.releasePointerCapture(e.pointerId); } catch{}
   });
 
-  // Content save on blur
-  t.addEventListener('input', e => {
-    box.content = t.textContent;
-  });
+  // Content live update
+  t.addEventListener('input', e => { box.content = t.textContent; });
 
   cardsLayer.appendChild(t);
   return t;
 }
-
 function makeEdgeView(edge) {
   const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
   ln.setAttribute("stroke", "#fff");
@@ -505,7 +390,6 @@ function makeEdgeView(edge) {
   wiresLayer.appendChild(ln);
   return ln;
 }
-
 function anchorCenter(cardId) {
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
@@ -513,12 +397,8 @@ function anchorCenter(cardId) {
   if (!anchor) return null;
   const rect = anchor.getBoundingClientRect();
   const stageRect = stage.getBoundingClientRect();
-  return {
-    x: (rect.left + rect.width / 2 - stageRect.left - tx) / scale,
-    y: (rect.top + rect.height / 2 - stageRect.top - ty) / scale,
-  };
+  return { x: (rect.left + rect.width / 2 - stageRect.left - tx) / scale, y: (rect.top + rect.height / 2 - stageRect.top - ty) / scale };
 }
-
 function updateEdge(edge) {
   const start = anchorCenter(edge.a.card);
   const end = anchorCenter(edge.b.card);
@@ -530,11 +410,7 @@ function updateEdge(edge) {
   line.setAttribute("x2", end.x);
   line.setAttribute("y2", end.y);
 }
-
-function updateEdges() {
-  edges.forEach(updateEdge);
-}
-
+function updateEdges() { edges.forEach(updateEdge); }
 function render() {
   cardsLayer.innerHTML = '';
   wiresLayer.innerHTML = '';
@@ -543,65 +419,55 @@ function render() {
   edges.forEach(makeEdgeView);
   updateEdges();
   applyTransform();
+  renderMinimap();
 }
 
+// History
 function snapshot() {
   undoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
+  if (undoStack.length > 100) undoStack.shift();
   redoStack = [];
 }
-
 function undo() {
-  if(undoStack.length === 0){
-    alert("Nothing to undo");
-    return;
-  }
+  if(undoStack.length === 0){ alert("Nothing to undo"); return; }
   redoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
   const state = undoStack.pop();
   loadState(state);
   render();
   toast("Undo");
 }
-
 function redo() {
-  if(redoStack.length === 0){
-    alert("Nothing to redo");
-    return;
-  }
+  if(redoStack.length === 0){ alert("Nothing to redo"); return; }
   undoStack.push(JSON.parse(JSON.stringify({cards, edges, textBoxes, tx, ty, scale})));
   const state = redoStack.pop();
   loadState(state);
   render();
   toast("Redo");
 }
-
 function loadState(state) {
-  cards.splice(0, cards.length, ...state.cards);
-  edges.splice(0, edges.length, ...state.edges);
-  textBoxes.splice(0, textBoxes.length, ...state.textBoxes);
-  tx = state.tx;
-  ty = state.ty;
-  scale = state.scale;
+  cards.splice(0, cards.length, ...(state.cards || []));
+  edges.splice(0, edges.length, ...(state.edges || []));
+  textBoxes.splice(0, textBoxes.length, ...(state.textBoxes || []));
+  tx = state.tx || 0;
+  ty = state.ty || 0;
+  scale = state.scale || 1;
   applyTransform();
 }
 
+// Selection helpers
 function deselect() {
   if(selected){
     let el = document.getElementById(selected);
     if(el) el.classList.remove("selected");
-    selected = null;
-    selectedType = null;
+    selected = null; selectedType = null;
   }
   closeEditor();
 }
-function closeEditor() {
-  document.getElementById("editor").style.display = "none";
-}
-
+function closeEditor() { document.getElementById("editor").style.display = "none"; }
 function openEditor(id, type){
   let ed = document.getElementById("editor");
   ed.style.display = "block";
-
-  // Clear all inputs first
+  // Clear fields
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
@@ -615,9 +481,11 @@ function openEditor(id, type){
   document.getElementById("fRelatedName").value = "";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
+  document.getElementById("fImageFile").value = "";
+  document.getElementById("fRelatedFile").value = "";
+  document.getElementById("fOtherFile").value = "";
 
-  selected = id;
-  selectedType = type;
+  selected = id; selectedType = type;
 
   if(type === "card"){
     const card = cards.find(c => c.id === id);
@@ -631,21 +499,20 @@ function openEditor(id, type){
     document.getElementById("fDesc").value = card.data.desc || "";
     renderFileList("relatedList", card.data.relatedFiles);
     renderFileList("otherList", card.data.otherFiles);
-  }
-  else if(type === "textbox"){
+  } else if(type === "textbox"){
     const box = textBoxes.find(t => t.id === id);
     if(!box) return;
+    // Use description field to edit textbox content for simplicity
     document.getElementById("fDesc").value = box.content || "";
+    // Hide irrelevant fields visually by disabling inputs
   }
 }
-
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
   Object.keys(branchColors).forEach(b=>{
     const opt = document.createElement("option");
-    opt.value = b;
-    opt.textContent = b;
+    opt.value = b; opt.textContent = b;
     if(b === selectedBranch) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -655,8 +522,7 @@ function fillRankSelect(branch, selectedRank){
   sel.innerHTML = "";
   (rankLists[branch] || ['None']).forEach(r=>{
     const opt = document.createElement("option");
-    opt.value = r;
-    opt.textContent = r;
+    opt.value = r; opt.textContent = r;
     if(r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
@@ -668,17 +534,22 @@ function renderFileList(containerId, files){
     cont.textContent = "(none)";
     return;
   }
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 0';
+  ul.style.paddingLeft = '18px';
   files.forEach(f=>{
+    const li = document.createElement('li');
     const a = document.createElement("a");
     a.href = f.url || f;
     a.textContent = f.name || fileNameFromUrl(f.url || f);
-    a.target = "_blank";
-    a.rel = "noopener";
-    cont.appendChild(a);
+    a.target = "_blank"; a.rel = "noopener";
+    li.appendChild(a);
+    ul.appendChild(li);
   });
+  cont.appendChild(ul);
 }
 
-// Add related file URL and name to card
+// Editor buttons: add external URLs or local files (as object URLs)
 document.getElementById("btnAddRelated").onclick = ()=>{
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fRelatedUrl").value.trim();
@@ -686,15 +557,15 @@ document.getElementById("btnAddRelated").onclick = ()=>{
   if(!url) return alert("Please enter a URL");
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
-  if(!card.data.relatedFiles) card.data.relatedFiles = [];
+  card.data.relatedFiles = card.data.relatedFiles || [];
   if(!card.data.relatedFiles.some(f=>f.url === url)) {
     card.data.relatedFiles.push({url, name});
     renderFileList("relatedList", card.data.relatedFiles);
     document.getElementById("fRelatedUrl").value = "";
     document.getElementById("fRelatedName").value = "";
+    snapshot();
   }
 };
-// Add other file URL and name to card
 document.getElementById("btnAddOther").onclick = ()=>{
   if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fOtherUrl").value.trim();
@@ -702,14 +573,45 @@ document.getElementById("btnAddOther").onclick = ()=>{
   if(!url) return alert("Please enter a URL");
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
-  if(!card.data.otherFiles) card.data.otherFiles = [];
+  card.data.otherFiles = card.data.otherFiles || [];
   card.data.otherFiles.push({url, name});
   renderFileList("otherList", card.data.otherFiles);
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
+  snapshot();
+};
+// Local file helpers (object URLs). Replace with Firebase Storage upload if needed.
+function addLocalFileTo(listKey, inputElId){
+  if(!selected || selectedType !== 'card') return alert("No card selected");
+  const inp = document.getElementById(inputElId);
+  if(!inp.files || inp.files.length === 0) return alert("Choose a file");
+  const file = inp.files;
+  const url = URL.createObjectURL(file);
+  const name = file.name;
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  card.data[listKey] = card.data[listKey] || [];
+  card.data[listKey].push({url, name});
+  renderFileList(listKey === 'relatedFiles' ? "relatedList" : "otherList", card.data[listKey]);
+  inp.value = "";
+  snapshot();
+}
+document.getElementById("btnAddRelatedFile").onclick = ()=> addLocalFileTo('relatedFiles','fRelatedFile');
+document.getElementById("btnAddOtherFile").onclick = ()=> addLocalFileTo('otherFiles','fOtherFile');
+
+document.getElementById("btnUseLocalImage").onclick = ()=>{
+  if(!selected || selectedType !== 'card') return alert("No card selected");
+  const f = document.getElementById("fImageFile");
+  if(!f.files || f.files.length===0) return alert("Choose an image");
+  const url = URL.createObjectURL(f.files);
+  document.getElementById("fImage").value = url;
+  const card = cards.find(c=>c.id === selected);
+  if(card){ card.data.image = url; const el = document.getElementById(card.id); if(el){ const img = el.querySelector('.img'); if(img) img.src = url; } }
+  f.value = "";
+  snapshot();
 };
 
-// Save button: saves card or textbox data
+// Save in-editor changes
 document.getElementById("btnSave").onclick = ()=>{
   if(!selected) return;
   if(selectedType === 'card'){
@@ -723,39 +625,32 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.status = document.getElementById("fStatus").value;
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
+    // Re-render only this card
     const oldEl = document.getElementById(card.id);
     if(oldEl) oldEl.remove();
     makeCardView(card);
     updateEdges();
-  }
-  else if(selectedType === 'textbox'){
+  } else if(selectedType === 'textbox'){
     const box = textBoxes.find(t => t.id === selected);
     if(!box) return;
     box.content = document.getElementById("fDesc").value.trim();
     const oldEl = document.getElementById(box.id);
-    if(oldEl){
-      oldEl.textContent = box.content;
-    }
+    if(oldEl){ oldEl.textContent = box.content; }
   }
   closeEditor();
   snapshot();
   render();
 };
 document.getElementById("btnCancel").onclick = closeEditor;
+document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
 
-document.getElementById("fBranch").addEventListener("change", (e)=>{
-  fillRankSelect(e.target.value, null);
-});
-
-// Double-click stage to add card
-stage.addEventListener("dblclick", e=>{
-  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#ui") || e.target.classList.contains("textbox")) return;
-  const pos = clientToWorld(e.clientX, e.clientY);
+// Create new elements
+function createDefaultCard(pos){
   const id = "c" + Math.random().toString(36).slice(2,9);
   const newCard = {
     id,
-    x: pos.x - 180,
-    y: pos.y - 90,
+    x: snapToGrid(pos.x - 180),
+    y: snapToGrid(pos.y - 90),
     data: {
       image: "https://i.ibb.co/zhKnjbh1/unknownperson.png",
       name: "New Profile",
@@ -769,53 +664,92 @@ stage.addEventListener("dblclick", e=>{
       branchColor: branchColors["None"],
     },
   };
-  cards.push(newCard);
-  selected = id;
-  selectedType = 'card';
-  makeCardView(newCard);
-  snapshot();
-  render();
-  openEditor(id, 'card');
-});
-
-// Add Text Box button adds a new textbox
-document.getElementById("addTextBoxBtn").onclick = () => {
-  const pos = { x: 50, y: 50 };
+  return newCard;
+}
+function createDefaultTextbox(pos){
   const id = "t" + Math.random().toString(36).slice(2,9);
-  const newBox = { id, x: pos.x, y: pos.y, content: "", width: 300 };
-  textBoxes.push(newBox);
-  selected = id;
-  selectedType = 'textbox';
-  makeTextBoxView(newBox);
-  snapshot();
-  render();
-  openEditor(id, 'textbox');
+  return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300 };
+}
+// Toolbar bindings
+document.getElementById("addProfileBtn").onclick = ()=>{
+  const pos = { x: 100, y: 100 };
+  const newCard = createDefaultCard(pos);
+  cards.push(newCard);
+  selected = newCard.id; selectedType = 'card';
+  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 };
-
-// Undo/Redo buttons
+document.getElementById("addTextBtn").onclick = ()=>{
+  const pos = { x: 200, y: 200 };
+  const newBox = createDefaultTextbox(pos);
+  textBoxes.push(newBox);
+  selected = newBox.id; selectedType = 'textbox';
+  makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
+};
+document.getElementById("deleteSelectedBtn").onclick = function(){
+  if(!selected) { alert("Select a card or textbox first"); return; }
+  if(!confirm("Delete selected item?")) return;
+  if(selectedType === "card"){
+    cards.splice(cards.findIndex(c => c.id === selected), 1);
+    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
+  } else if(selectedType === "textbox"){
+    textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
+  }
+  const el = document.getElementById(selected);
+  if(el) el.remove();
+  selected = null; selectedType = null; closeEditor(); render(); snapshot();
+};
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
-// Zoom functionality on mouse wheel
+// Double-click stage to add a card (keep original UX)
+stage.addEventListener("dblclick", e=>{
+  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
+  const pos = clientToWorld(e.clientX, e.clientY);
+  const newCard = createDefaultCard(pos);
+  cards.push(newCard);
+  selected = newCard.id; selectedType = 'card';
+  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
+});
+
+// Search filtering
+document.getElementById("searchBox").oninput = function(){
+  const query = this.value.toLowerCase();
+  cards.forEach(card=>{
+    const el = document.getElementById(card.id);
+    if(!el) return;
+    const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
+    el.style.display = !query || text.includes(query) ? "flex" : "none";
+  });
+  textBoxes.forEach(box=>{
+    const el = document.getElementById(box.id);
+    if(!el) return;
+    const text = (box.content || "").toLowerCase();
+    el.style.display = !query || text.includes(query) ? "block" : "none";
+  });
+};
+
+// Zoom with smart focal point, keep snapping consistent
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
   const mousePos = clientToWorld(e.clientX, e.clientY);
-  if (e.deltaY < 0) scale *= zoomFactor;
-  else scale /= zoomFactor;
+  const oldScale = scale;
+  scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
   scale = Math.min(Math.max(scale, 0.25), 4);
+  // keep mouse point fixed
   tx = e.clientX - mousePos.x * scale;
   ty = e.clientY - mousePos.y * scale;
   applyTransform();
-  render();
+  updateEdges();
+  renderMinimap();
 }, { passive: false });
 
-// Drag to pan viewport
+// Panning
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOrigin = { tx: 0, ty: 0 };
 stage.addEventListener('pointerdown', e => {
-  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#ui') || e.target.classList.contains('textbox')) return;
+  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
   isPanning = true;
   panStart.x = e.clientX;
   panStart.y = e.clientY;
@@ -831,29 +765,26 @@ stage.addEventListener('pointermove', e => {
   tx = panOrigin.tx + dx;
   ty = panOrigin.ty + dy;
   applyTransform();
-  render();
+  updateEdges();
+  renderMinimap();
 });
 stage.addEventListener('pointerup', e => {
   if (!isPanning) return;
   isPanning = false;
   stage.style.cursor = 'grab';
-  stage.releasePointerCapture(e.pointerId);
+  try { stage.releasePointerCapture(e.pointerId); } catch{}
   snapshot();
 });
 stage.addEventListener('pointercancel', e => {
   if (!isPanning) return;
   isPanning = false;
   stage.style.cursor = 'grab';
-  stage.releasePointerCapture(e.pointerId);
+  try { stage.releasePointerCapture(e.pointerId); } catch{}
   snapshot();
 });
 
-// Anchor dragging and creating links
-let anchorDrag = {
-  active: false,
-  startCardId: null,
-  tmpLine: null,
-};
+// Anchor linking
+let anchorDrag = { active:false, startCardId:null, tmpLine:null };
 stage.addEventListener('pointerdown', e => {
   if (e.target.classList.contains('anchor')) {
     const cardEl = e.target.closest('.card');
@@ -872,7 +803,7 @@ stage.addEventListener('pointerdown', e => {
       anchorDrag.tmpLine.setAttribute('x2', startPos.x);
       anchorDrag.tmpLine.setAttribute('y2', startPos.y);
     }
-    e.target.setPointerCapture(e.pointerId);
+    try { e.target.setPointerCapture(e.pointerId); } catch{}
   }
 });
 stage.addEventListener('pointermove', e => {
@@ -886,43 +817,61 @@ stage.addEventListener('pointermove', e => {
 stage.addEventListener('pointerup', e => {
   if (!anchorDrag.active) return;
   anchorDrag.active = false;
-  if (anchorDrag.tmpLine) {
-    anchorDrag.tmpLine.remove();
-    anchorDrag.tmpLine = null;
-  }
+  if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
   let targetCard = null;
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  if(el) {
-    const cardEl = el.closest('.card');
-    if(cardEl) targetCard = cardEl.id;
-  }
-  if (!targetCard || targetCard === anchorDrag.startCardId) {
-    e.target.releasePointerCapture(e.pointerId);
-    return;
-  }
-  if (!edges.some(edge => 
-    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) || 
+  if(el) { const cardEl = el.closest('.card'); if(cardEl) targetCard = cardEl.id; }
+  if (!targetCard || targetCard === anchorDrag.startCardId) { try{ e.target.releasePointerCapture(e.pointerId); }catch{} return; }
+  if (!edges.some(edge =>
+    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
     (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
   )) {
-    const newEdge = {
-      id: "e" + Math.random().toString(36).slice(2,9),
-      a: { card: anchorDrag.startCardId },
-      b: { card: targetCard }
-    };
+    const newEdge = { id: "e" + Math.random().toString(36).slice(2,9), a: { card: anchorDrag.startCardId }, b: { card: targetCard } };
     edges.push(newEdge);
     makeEdgeView(newEdge);
     updateEdges();
-    snapshot();
-    render();
+    snapshot(); render();
   }
-  e.target.releasePointerCapture(e.pointerId);
+  try{ e.target.releasePointerCapture(e.pointerId); }catch{}
 });
 
-// Following are firebase live sync and UI event handlers
+// Deselect on stage click (blank)
+stage.addEventListener("click", e=>{
+  if(e.target === stage || e.target === viewport){
+    if(selected){ const el = document.getElementById(selected); if(el) el.classList.remove("selected"); selected = null; selectedType = null; closeEditor(); }
+  }
+});
 
+// Minimap render
+function renderMinimap(){
+  minimapSVG.innerHTML = "";
+  const sx = 0.08, sy = 0.08;
+  cards.forEach(c=>{
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", c.x * sx);
+    rect.setAttribute("y", c.y * sy);
+    rect.setAttribute("width", 360 * sx);
+    rect.setAttribute("height", 120 * sy);
+    rect.setAttribute("fill", (c.data.branchColor||"#777"));
+    rect.setAttribute("fill-opacity", "0.9");
+    minimapSVG.appendChild(rect);
+  });
+  textBoxes.forEach(t=>{
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", t.x * sx);
+    rect.setAttribute("y", t.y * sy);
+    rect.setAttribute("width", 300 * sx);
+    rect.setAttribute("height", 60 * sy);
+    rect.setAttribute("fill", "#999");
+    rect.setAttribute("fill-opacity", "0.7");
+    minimapSVG.appendChild(rect);
+  });
+  // Optional: viewport rectangle could be computed if you track world extents.
+}
+
+// Live sync + web list
 const webNameInput = document.getElementById('webNameInput');
 const webListDropdown = document.getElementById('webListDropdown');
-
 let currentWebListener = null;
 
 async function subscribeToWeb(name) {
@@ -938,26 +887,20 @@ async function subscribeToWeb(name) {
     const data = snapshot.val();
     if (!data) {
       toast(`No data found for "${name}"`);
-      cards = [];
-      edges = [];
-      textBoxes = [];
+      cards = []; edges = []; textBoxes = [];
+      tx = 0; ty = 0; scale = 1;
       render();
       return;
     }
     cards.splice(0, cards.length, ...(data.cards || []));
     edges.splice(0, edges.length, ...(data.edges || []));
     textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
-    tx = data.tx || 0;
-    ty = data.ty || 0;
-    scale = data.scale || 1;
+    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
     applyTransform();
     render();
     toast(`Synced with "${name}"`);
-  }, error => {
-    alert("Realtime sync failed: " + error.message);
-  });
+  }, error => { alert("Realtime sync failed: " + error.message); });
 }
-
 webListDropdown.addEventListener("change", (e) => {
   const name = e.target.value;
   if (!name) return;
@@ -972,54 +915,30 @@ webNameInput.addEventListener("change", (e) => {
   subscribeToWeb(name);
   if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
     const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
+    opt.value = name; opt.textContent = name;
     webListDropdown.appendChild(opt);
     webListDropdown.value = name;
   }
 });
-
 async function saveCurrentWeb() {
   const name = webNameInput.value.trim();
-  if (!name) {
-    alert("Enter a Connection Web name");
-    return;
-  }
+  if (!name) { alert("Enter a Connection Web name"); return; }
   const data = { cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() };
-  try {
-    await db.ref(`connectionWebs/${name}`).set(data);
-    toast("Connection Web saved!");
-  } catch (e) {
-    alert("Save failed: " + e.message);
-  }
+  try { await db.ref(`connectionWebs/${name}`).set(data); toast("Connection Web saved!"); }
+  catch (e) { alert("Save failed: " + e.message); }
 }
-document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
-
 async function deleteCurrentWeb() {
   const name = webListDropdown.value;
-  if (!name) {
-    alert("Select a Connection Web to delete");
-    return;
-  }
+  if (!name) { alert("Select a Connection Web to delete"); return; }
   const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
-  if (confirmed !== "DELETE") {
-    alert("Deletion cancelled");
-    return;
-  }
+  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
   try {
-    if (currentWebListener) {
-      db.ref(`connectionWebs/${name}`).off('value', currentWebListener);
-      currentWebListener = null;
-    }
+    if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
     await db.ref(`connectionWebs/${name}`).remove();
     toast("Connection Web deleted");
     await refreshWebList();
-  } catch (e) {
-    alert("Delete failed: " + e.message);
-  }
+  } catch (e) { alert("Delete failed: " + e.message); }
 }
-document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
-
 async function refreshWebList() {
   try {
     const snapshot = await db.ref('connectionWebs').once('value');
@@ -1027,8 +946,7 @@ async function refreshWebList() {
     webListDropdown.innerHTML = "";
     Object.keys(data).sort().forEach(name => {
       const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
+      opt.value = name; opt.textContent = name;
       webListDropdown.appendChild(opt);
     });
     let last = localStorage.getItem("lastWeb");
@@ -1037,63 +955,31 @@ async function refreshWebList() {
       webNameInput.value = last;
       subscribeToWeb(last);
     }
-  } catch (e) {
-    console.error("Failed to load Connection Webs list:", e);
-  }
+  } catch (e) { console.error("Failed to load Connection Webs list:", e); }
 }
-
-document.getElementById("deleteCardBtn").onclick = function(){
-  if(!selected) {
-    alert("Select a card or textbox first");
-    return;
-  }
-  if(!confirm("Delete selected item?")) return;
-  if(selectedType === "card"){
-    cards.splice(cards.findIndex(c => c.id === selected), 1);
-    edges.splice(0, edges.length, ...edges.filter(e => e.a.card !== selected && e.b.card !== selected));
-  }
-  else if(selectedType === "textbox"){
-    textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
-  }
-  const el = document.getElementById(selected);
-  if(el) el.remove();
-  selected = null;
-  selectedType = null;
-  closeEditor();
-  render();
-  snapshot();
+document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
+document.getElementById("loadWebBtn").onclick = ()=> {
+  const name = webListDropdown.value || webNameInput.value.trim();
+  if(!name) { alert("Pick or type a web name to load"); return; }
+  subscribeToWeb(name);
 };
+document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
 
+// Stage blank-click deselect
+document.addEventListener("DOMContentLoaded", ()=>{ refreshWebList(); });
+
+// Click passthrough
 stage.addEventListener("click", e=>{
   if(e.target === stage){
     if(selected){
       const el = document.getElementById(selected);
       if(el) el.classList.remove("selected");
-      selected = null;
-      selectedType = null;
-      closeEditor();
+      selected = null; selectedType = null; closeEditor();
     }
   }
-});
-document.getElementById("searchBox").oninput = function(){
-  const query = this.value.toLowerCase();
-  cards.forEach(card=>{
-    const el = document.getElementById(card.id);
-    if(!el) return;
-    const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
-    el.style.display = !query || text.includes(query) ? "flex" : "none";
-  });
-  textBoxes.forEach(box=>{
-    const el = document.getElementById(box.id);
-    if(!el) return;
-    const text = box.content.toLowerCase();
-    el.style.display = !query || text.includes(query) ? "block" : "none";
-  });
-};
-
-document.addEventListener("DOMContentLoaded", ()=>{
-  refreshWebList();
 });
 </script>
 </body>
 </html>
+
+[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/99374876/b6f0a04b-29a4-4fc2-8ca5-6a349ccb9f18/paste.txt)
