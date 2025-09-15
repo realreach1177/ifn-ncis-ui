@@ -466,38 +466,6 @@ function renderMinimap() {
   });
 }
   
-  if (minX === Infinity) {
-    minX = 0; minY = 0; maxX = 1000; maxY = 800;
-  }
-
-  const workspaceWidth = maxX - minX;
-  const workspaceHeight = maxY - minY;
-  const scaleX = minimapWidth / workspaceWidth;
-  const scaleY = minimapHeight / workspaceHeight;
-  const scale = Math.min(scaleX, scaleY);
-
-  cards.forEach(c => {
-    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    rect.setAttribute("x", (c.x - minX) * scale);
-    rect.setAttribute("y", (c.y - minY) * scale);
-    rect.setAttribute("width", 360 * scale);
-    rect.setAttribute("height", 120 * scale);
-    rect.setAttribute("fill", (c.data.branchColor || "#777"));
-    rect.setAttribute("fill-opacity", "0.9");
-    minimapSVG.appendChild(rect);
-  });
-
-  textBoxes.forEach(t => {
-    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    rect.setAttribute("x", (t.x - minX) * scale);
-    rect.setAttribute("y", (t.y - minY) * scale);
-    rect.setAttribute("width", (t.width || 300) * scale);
-    rect.setAttribute("height", 60 * scale);
-    rect.setAttribute("fill", "#999");
-    rect.setAttribute("fill-opacity", "0.7");
-    minimapSVG.appendChild(rect);
-  });
-}
 
 function makeTextBoxView(box) {
   const t = document.createElement('div');
