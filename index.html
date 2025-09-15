@@ -50,7 +50,20 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .alive { background:#4caf50; }
 .dead { background:#e53935; }
 .unknown { background:#212121; border:1.5px solid #78909c; }
-.anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:12px; left:50%; transform:translate(-50%, -50%); z-index:20; cursor:crosshair; }
+.anchor {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffd54f;
+  border: 2px solid #333;
+  top: -12px;              /* sits above the card */
+  left: 50%;
+  transform: translateX(-50%); /* only center horizontally */
+  z-index: 20;
+  cursor: crosshair;
+}
+
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
   box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
