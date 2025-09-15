@@ -979,17 +979,20 @@ stage.addEventListener('pointercancel', e => {
 
 // Anchor linking
 let anchorDrag = { active:false, startCardId:null, tmpLine:null };
+
 stage.addEventListener('pointerdown', e => {
   if (e.target.classList.contains('anchor')) {
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
     anchorDrag.active = true;
     anchorDrag.startCardId = cardEl.id;
+
     const svgNS = "http://www.w3.org/2000/svg";
     anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
     anchorDrag.tmpLine.setAttribute('stroke', '#ffd54f');
     anchorDrag.tmpLine.setAttribute('stroke-width', '3');
     wiresLayer.appendChild(anchorDrag.tmpLine);
+
     const startPos = anchorCenter(anchorDrag.startCardId);
     if (startPos) {
       anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -997,37 +1000,63 @@ stage.addEventListener('pointerdown', e => {
       anchorDrag.tmpLine.setAttribute('x2', startPos.x);
       anchorDrag.tmpLine.setAttribute('y2', startPos.y);
     }
-    try { e.target.setPointerCapture(e.pointerId); } catch{}
+    try { e.target.setPointerCapture(e.pointerId); } catch {}
   }
 });
+
 stage.addEventListener('pointermove', e => {
   if (!anchorDrag.active) return;
+  // Convert pointer pos to stage coordinates
   const pos = clientToWorld(e.clientX, e.clientY);
   if (anchorDrag.tmpLine) {
     anchorDrag.tmpLine.setAttribute('x2', pos.x);
     anchorDrag.tmpLine.setAttribute('y2', pos.y);
   }
 });
+
 stage.addEventListener('pointerup', e => {
   if (!anchorDrag.active) return;
   anchorDrag.active = false;
-  if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
+
   let targetCard = null;
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  if(el) { const cardEl = el.closest('.card'); if(cardEl) targetCard = cardEl.id; }
-  if (!targetCard || targetCard === anchorDrag.startCardId) { try{ e.target.releasePointerCapture(e.pointerId); }catch{} return; }
+  if(el) { 
+    const cardEl = el.closest('.card'); 
+    if(cardEl) targetCard = cardEl.id; 
+  }
+
+  if (!targetCard || targetCard === anchorDrag.startCardId) {
+    if (anchorDrag.tmpLine) {
+      anchorDrag.tmpLine.remove();
+      anchorDrag.tmpLine = null;
+    }
+    try { e.target.releasePointerCapture(e.pointerId); } catch {}
+    return;
+  }
+
   if (!edges.some(edge =>
     (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
     (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
   )) {
-    const newEdge = { id: "e" + Math.random().toString(36).slice(2,9), a: { card: anchorDrag.startCardId }, b: { card: targetCard } };
+    const newEdge = { 
+      id: "e" + Math.random().toString(36).slice(2,9), 
+      a: { card: anchorDrag.startCardId }, 
+      b: { card: targetCard } 
+    };
     edges.push(newEdge);
     makeEdgeView(newEdge);
     updateEdges();
-    snapshot(); render();
+    snapshot();
+    render();
   }
-  try{ e.target.releasePointerCapture(e.pointerId); }catch{}
+
+  if (anchorDrag.tmpLine) {
+    anchorDrag.tmpLine.remove();
+    anchorDrag.tmpLine = null;
+  }
+  try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
+
 
 // Deselect on stage click
 stage.addEventListener("click", e=>{
