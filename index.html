@@ -4,186 +4,189 @@
 <meta charset="UTF-8" />
 <title>OrgChart Connection Web — Fixed</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<!-- Firebase SDKs (compat used in your original) -->
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-  /* Basic page */
-  html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
+html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
+/* Toolbar (merged) */
+#toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
+.toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
+#toolbar button, #toolbar input, #toolbar select { border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer; font-size:14px; }
+#toolbar button { background:#333; color:#eee; transition: background-color 0.25s ease, box-shadow 0.25s ease; }
+#toolbar button:hover { background:#3f3f3f; box-shadow:0 0 10px rgba(255,255,255,0.08); }
+#saveWebBtn { background:#2e7d32; color:#fff; }
+#loadWebBtn { background:#1565c0; color:#fff; }
+#deleteWebBtn { background:#c62828; color:#fff; }
+#webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
+/* Stage and layers */
+#stage { position:absolute; inset:0; overflow:hidden; background:#141414; cursor:grab;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size:40px 40px;
+}
+/* viewport is the element that translates + scales */
+#viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
+/* wires and cards live inside viewport so they share the same CSS transform */
+#wires { position:absolute; left:0; top:0; width:3000px; height:1000px; overflow:visible; pointer-events:none; z-index:1; }
+#cards { position:absolute; left:0; top:0; width:3000px; height:1000px; }
+/* visual map border (black edge at the world boundary) */
+#mapBorder {
+  position:absolute;
+  left:0; top:0;
+  width:3000px; height:1000px;
+  box-sizing:border-box;
+  border:12px solid rgba(0,0,0,1); /* hard black edge */
+  pointer-events:none;
+  z-index:0;
+}
 
-  /* Toolbar */
-  #toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
-  .toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
-  #toolbar button, #toolbar input, #toolbar select { border:none; border-radius:6px; padding:6px 12px; font-weight:600; cursor:pointer; font-size:14px; }
-  #toolbar button { background:#333; color:#eee; transition: background-color 0.25s ease, box-shadow 0.25s ease; }
-  #toolbar button:hover { background:#3f3f3f; box-shadow:0 0 10px rgba(255,255,255,0.08); }
-  #saveWebBtn { background:#2e7d32; color:#fff; }
-  #loadWebBtn { background:#1565c0; color:#fff; }
-  #deleteWebBtn { background:#c62828; color:#fff; }
-  #webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
+/* Cards and textboxes */
+.card, .textbox-wrapper {
+  position:absolute; padding:0; box-sizing:border-box;
+  user-select:none; cursor:grab; z-index:10; transition:box-shadow 0.15s;
+}
+.card { position:relative; width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:visible; }
+.textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
+.textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, "Segoe UI", Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; }
+.card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50); }
+.card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
+.img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
+.info { flex:1; overflow:hidden; }
+.name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
+.rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
+.bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
+.status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+.dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
+.alive { background:#4caf50; } .dead { background:#e53935; } .unknown { background:#212121; border:1.5px solid #78909c; }
 
-  /* Stage / viewport */
-  #stage { position:absolute; inset:0; overflow:hidden; background:#141414; cursor:grab;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-    background-size:40px 40px;
-  }
-  #viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
-  /* We'll keep wires & cards inside the viewport but give them fixed world-size */
-  #wires { position:absolute; left:0; top:0; width:3000px; height:1000px; overflow:visible; pointer-events:none; z-index:1; }
-  #cards { position:absolute; left:0; top:0; width:3000px; height:1000px; }
+/* Anchor dot */
+.anchor {
+  position:absolute;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:#ffffff;
+  border:2px solid #000000;
+  top:-8px;        /* near the top of the card, slightly above */
+  left:50%;
+  transform:translateX(-50%);
+  z-index:9999;
+  cursor:crosshair;
+}
 
-  /* Cards & textboxes */
-  .card, .textbox-wrapper {
-    position:absolute; padding:0; box-sizing:border-box;
-    user-select:none; cursor:grab; z-index:10; transition:box-shadow 0.15s;
-  }
-  .card {
-    position:relative; width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:visible;
-  }
-  .textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
-  .textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, "Segoe UI", Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; }
+/* Editor side panel */
+#editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee; box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
+#editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
+#editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
+#editor input, #editor select, #editor textarea { width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px; }
+#editor textarea { min-height:60px; }
+#editor .btns { margin-top:14px; display:flex; gap:10px; }
+#editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
+#editor .btns button:hover { background:#1769aa; }
+#editor .btns button.save { background:#4caf50; }
+#editor .btns button.save:hover { background:#388e3c; }
+.file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
+.file-list a { color:#74b9ff; text-decoration:none; }
+.file-list a:hover { text-decoration:underline; }
+/* Toasts */
+.toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px; box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
 
-  .card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50); }
-  .card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
-
-  .img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
-  .info { flex:1; overflow:hidden; }
-  .name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
-  .rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
-  .bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
-  .status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
-  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
-  .alive { background:#4caf50; } .dead { background:#e53935; } .unknown { background:#212121; border:1.5px solid #78909c; }
-
-  /* Anchor style: top but slightly below the card top (so it's visible) */
-  .anchor {
-    position:absolute; width:16px; height:16px; border-radius:50%;
-    background:#ffffff; border:2px solid #000000;
-    top:-6px; left:50%; transform:translateX(-50%); z-index:9999; cursor:crosshair;
-  }
-
-  /* Editor */
-  #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee; box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
-  #editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
-  #editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
-  #editor input, #editor select, #editor textarea { width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px; }
-  #editor textarea { min-height:60px; }
-  #editor .btns { margin-top:14px; display:flex; gap:10px; }
-  #editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
-  #editor .btns button:hover { background:#1769aa; }
-  #editor .btns button.save { background:#4caf50; }
-  #editor .btns button.save:hover { background:#388e3c; }
-  .file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
-  .file-list a { color:#74b9ff; text-decoration:none; }
-  .file-list a:hover { text-decoration:underline; }
-
-  /* Toast */
-  .toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px; box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
-
-  /* Flash highlight for focus */
-  @keyframes flash { 0%{ box-shadow:0 0 0 0 rgba(255,215,0,0.9);} 50%{ box-shadow:0 0 25px 8px rgba(255,215,0,0.9);} 100%{ box-shadow:0 0 0 0 rgba(255,215,0,0); } }
-  .flash-highlight { animation: flash 1s ease-out 2; }
+@keyframes flash { 0%{ box-shadow:0 0 0 0 rgba(255,215,0,0.9);} 50%{ box-shadow:0 0 25px 8px rgba(255,215,0,0.9);} 100%{ box-shadow:0 0 0 0 rgba(255,215,0,0); } }
+.flash-highlight { animation: flash 1s ease-out 2; }
 </style>
 </head>
 <body>
-  <!-- Toolbar -->
-  <div id="toolbar">
-    <div class="toolbar-left">
-      <button id="addProfileBtn" title="Add Profile Card">Add Profile</button>
-      <button id="addTextBtn" title="Add Text Box">Add Text</button>
-      <button id="deleteSelectedBtn" title="Delete Selected">Delete</button>
-      <button id="undoBtn" title="Undo">Undo</button>
-      <button id="redoBtn" title="Redo">Redo</button>
-      <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
-    </div>
-    <div class="toolbar-right">
-      <input type="text" id="webNameInput" placeholder="Web Name" />
-      <select id="webListDropdown" title="Select Connection Web"></select>
-      <button id="saveWebBtn" title="Save Connection Web">Save</button>
-      <button id="loadWebBtn" title="Load Connection Web">Load</button>
-      <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
+<!-- Toolbar -->
+<div id="toolbar">
+  <div class="toolbar-left">
+    <button id="addProfileBtn" title="Add Profile Card">Add Profile</button>
+    <button id="addTextBtn" title="Add Text Box">Add Text</button>
+    <button id="deleteSelectedBtn" title="Delete Selected">Delete</button>
+    <button id="undoBtn" title="Undo">Undo</button>
+    <button id="redoBtn" title="Redo">Redo</button>
+    <input type="text" id="searchBox" placeholder="Search name, branch or rank..." />
+  </div>
+  <div class="toolbar-right">
+    <input type="text" id="webNameInput" placeholder="Web Name" />
+    <select id="webListDropdown" title="Select Connection Web"></select>
+    <button id="saveWebBtn" title="Save Connection Web">Save</button>
+    <button id="loadWebBtn" title="Load Connection Web">Load</button>
+    <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
+  </div>
+</div>
+
+<!-- Stage -->
+<div id="stage">
+  <div id="viewport">
+    <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
+    <div id="cards"></div>
+    <div id="mapBorder"></div>
+  </div>
+</div>
+
+<!-- Editor -->
+<div id="editor">
+  <header>Edit Item</header>
+
+  <label>Profile Picture URL</label>
+  <input id="fImage" type="url" placeholder="https://..." />
+
+  <label>Name</label>
+  <input id="fName" type="text" />
+
+  <label>Status</label>
+  <select id="fStatus">
+    <option>Alive</option>
+    <option>Dead</option>
+    <option>Unknown</option>
+  </select>
+
+  <label>Branch</label>
+  <select id="fBranch"></select>
+
+  <label>Subbranch</label>
+  <input id="fSubbranch" type="text" />
+
+  <label>Rank</label>
+  <select id="fRank"></select>
+
+  <label>Short Description</label>
+  <textarea id="fDesc"></textarea>
+
+  <label>Related Files (select from DB)</label>
+  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;"></select>
+
+  <label>Other Files (external URL)</label>
+  <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
+  <div style="display:flex; gap:8px; margin-top:6px;">
+    <button id="btnAddOther" type="button">Add URL</button>
+  </div>
+  <div id="otherList" class="file-list">(none)</div>
+
+  <div class="btns">
+    <button class="save" id="btnSave" type="button">Save</button>
+    <button id="btnCancel" type="button">Cancel</button>
+  </div>
+</div>
+
+<!-- Custom Confirm Modal -->
+<div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); 
+     z-index:1000000; justify-content:center; align-items:center;">
+  <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
+    <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
+    <div style="display:flex; justify-content:space-between; gap:10px;">
+      <button id="confirmYesBtn" style="flex:1; background:#c62828; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">Yes</button>
+      <button id="confirmNoBtn" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">No</button>
     </div>
   </div>
-
-  <!-- Stage -->
-  <div id="stage">
-    <div id="viewport">
-      <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
-      <div id="cards"></div>
-    </div>
-  </div>
-
-  <!-- Editor -->
-  <div id="editor">
-    <header>Edit Item</header>
-
-    <label>Profile Picture URL</label>
-    <input id="fImage" type="url" placeholder="https://..." />
-
-    <label>Name</label>
-    <input id="fName" type="text" />
-
-    <label>Status</label>
-    <select id="fStatus">
-      <option>Alive</option>
-      <option>Dead</option>
-      <option>Unknown</option>
-    </select>
-
-    <label>Branch</label>
-    <select id="fBranch"></select>
-
-    <label>Subbranch</label>
-    <input id="fSubbranch" type="text" />
-
-    <label>Rank</label>
-    <select id="fRank"></select>
-
-    <label>Short Description</label>
-    <textarea id="fDesc"></textarea>
-
-    <label>Related Files (from DB)</label>
-    <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;">
-      <!-- populated from DB: suspects / insurgents / informants -->
-    </select>
-    <div style="display:flex; gap:8px; margin-top:6px;">
-      <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" style="flex:1;" />
-      <button id="btnAddRelated" type="button">Add URL</button>
-    </div>
-    <div id="relatedList" class="file-list">(none)</div>
-
-    <label>Other Files (external URL)</label>
-    <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
-    <input id="fOtherName" type="text" placeholder="Display name for hyperlink" />
-    <div style="display:flex; gap:8px; margin-top:6px;">
-      <button id="btnAddOther" type="button">Add URL</button>
-    </div>
-    <div id="otherList" class="file-list">(none)</div>
-
-    <div class="btns">
-      <button class="save" id="btnSave" type="button">Save</button>
-      <button id="btnCancel" type="button">Cancel</button>
-    </div>
-  </div>
-
-  <!-- Confirm Modal -->
-  <div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000000; justify-content:center; align-items:center;">
-    <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
-      <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
-      <div style="display:flex; justify-content:space-between; gap:10px;">
-        <button id="confirmYesBtn" style="flex:1; background:#c62828; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">Yes</button>
-        <button id="confirmNoBtn" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">No</button>
-      </div>
-    </div>
-  </div>
+</div>
 
 <script>
-/* ==========================
-   Firebase config (kept as you provided)
-   ========================== */
+// Firebase config (kept same as you requested)
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -199,9 +202,11 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-/* ==========================
-   App state
-   ========================== */
+// App constants
+const WORLD_W = 3000;
+const WORLD_H = 1000;
+
+// App state
 let cards = [];
 let edges = [];
 let textBoxes = [];
@@ -210,7 +215,7 @@ let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
-const snap = 10;
+let snap = 10;
 let editingTextLabel = false;
 
 const viewport = document.getElementById('viewport');
@@ -230,23 +235,20 @@ const branchColors = {
 };
 const rankLists = {
   "None":["None"],
-  "United States Army":[ "US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","SMA","CSM","1SG","SFC","SSGT","SGT","CPL","PFC","PV2","PVT" ],
-  "United States Navy":[ "US General","US Lieutenant General","US Major General","Commander","XO","CAPT","CDR","LCDR","LT","LTJG","ENS","MCPON","MCPO","SCPO","CPO","PO1","PO2","PO3","SN","SA","SR" ],
-  "United States Marine Corps":[ "US General","US Lieutenant General","US Major General","Commander","XO","COL","LtCol","Maj","Cpt","1stLt","2ndLt","SgtMajMC","MGySgt","MSgt","GySgt","SSgt","Sgt","Cpl","LCpl","PFC","Pvt" ],
-  "United States Air Force":[ "US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","CMSAF","CMSgt","SMSgt","MSgt","TSgt","SSgt","SrA","A1C","Amn","AB" ],
-  "Taliban":[ "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB" ],
-  "Taliban Special Forces":[ "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII" ],
-  "Al-Qaeda":[ "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB" ]
+  "United States Army": ["US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","SMA","CSM","1SG","SFC","SSGT","SGT","CPL","PFC","PV2","PVT"],
+  "United States Navy":  ["US General","US Lieutenant General","US Major General","Commander","XO","CAPT","CDR","LCDR","LT","LTJG","ENS","MCPON","MCPO","SCPO","CPO","PO1","PO2","PO3","SN","SA","SR"],
+  "United States Marine Corps": ["US General","US Lieutenant General","US Major General","Commander","XO","COL","LtCol","Maj","Cpt","1stLt","2ndLt","SgtMajMC","MGySgt","MSgt","GySgt","SSgt","Sgt","Cpl","LCpl","PFC","Pvt"],
+  "United States Air Force": ["US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","CMSAF","CMSgt","SMSgt","MSgt","TSgt","SSgt","SrA","A1C","Amn","AB"],
+  "Taliban": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"],
+  "Taliban Special Forces": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"],
+  "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"]
 };
 
-/* ==========================
-   Helpers
-   ========================== */
 function contrast(hex) {
-  hex = (hex || '').replace('#','');
-  if(hex.length !== 6) return '#000';
-  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-  return ((r*299 + g*587 + b*114)/1000) >= 128 ? '#000' : '#fff';
+  hex = (hex || '').replace('#', '');
+  if (hex.length !== 6) return '#000';
+  const r = parseInt(hex.slice(0,2),16), g= parseInt(hex.slice(2,4),16), b= parseInt(hex.slice(4,6),16);
+  return ((r*299+g*587+b*114)/1000) >= 128 ? '#000' : '#fff';
 }
 function fileNameFromUrl(url) {
   if(typeof url !== 'string') return '';
@@ -258,42 +260,85 @@ function toast(msg){
   t.className = 'toast';
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(()=>{ t.style.opacity = '0'; setTimeout(()=>t.remove(), 300); }, 1500);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
 }
-function applyTransform(){ viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; updateEdges(); }
+function applyTransform(){
+  viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+}
 function clientToWorld(cx, cy){
-  const r = stage.getBoundingClientRect();
-  const sx = cx - r.left, sy = cy - r.top;
+  const r=stage.getBoundingClientRect();
+  const sx=cx-r.left, sy=cy-r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
 function snapToGrid(v){ return Math.round(v / snap) * snap; }
 
-/* ==========================
-   Anchor center & edge drawing
-   - anchorCenter uses model position (card.x, card.y) combined with anchor offset inside the card DOM.
-   - this avoids visual "unlinking" when zoom/pan.
-   ========================== */
+function clampViewport() {
+  // Ensure viewport cannot pan outside world bounds
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // world visible bounds: worldX visible at left = -tx/scale; worldX visible at right = (vw - tx)/scale
+  // enforce left >= 0 and right <= WORLD_W
+  const minTx = vw - WORLD_W * scale; // when the right edge of world aligns with viewport right
+  const maxTx = 0;                    // when left edge aligns
+  const minTy = vh - WORLD_H * scale;
+  const maxTy = 0;
+  if (tx < minTx) tx = minTx;
+  if (tx > maxTx) tx = maxTx;
+  if (ty < minTy) ty = minTy;
+  if (ty > maxTy) ty = maxTy;
+}
+
+/* ---------- Related files select (from Firebase) ---------- */
+/* Load suspects/insurgents/informants into the related-files select.
+   `selected` is an array of {url,name} that should be pre-selected. */
+async function fillRelatedSelect(selected = []) {
+  const sel = document.getElementById("fRelatedSelect");
+  sel.innerHTML = "";
+  const paths = ["suspects","insurgents","informants"];
+  for (let path of paths) {
+    try {
+      const snap = await db.ref(path).once('value');
+      if (snap.exists()) {
+        const group = document.createElement("optgroup");
+        group.label = path;
+        const val = snap.val();
+        // Expecting val to be an object of file entries: { id: { url:..., name:... }, ... }
+        Object.values(val).forEach(file => {
+          const opt = document.createElement("option");
+          opt.value = file.url || file.path || ""; // use file.url or fallback
+          opt.textContent = file.name || file.title || file.url || file.path || fileNameFromUrl(opt.value);
+          // If preselected, mark selected
+          if ((selected || []).some(s => (s.url || s) === opt.value)) {
+            opt.selected = true;
+          }
+          group.appendChild(opt);
+        });
+        sel.appendChild(group);
+      }
+    } catch (err) {
+      console.warn("Failed to load related list for", path, err);
+    }
+  }
+}
+
+/* ---------- Edge drawing & anchor positioning ---------- */
+/* Return anchor center in WORLD coordinates */
 function anchorCenter(cardId) {
-  const cardModel = cards.find(c => c.id === cardId);
-  if (!cardModel) return null;
   const cardEl = document.getElementById(cardId);
   if (!cardEl) return null;
   const anchorEl = cardEl.querySelector('.anchor');
   if (!anchorEl) return null;
-
-  // anchor offset inside card in CSS px (independent of viewport transform)
-  // offsetLeft/Top are relative to the positioned parent (the .card), which matches model coordinates.
-  const offsetX = anchorEl.offsetLeft + anchorEl.offsetWidth / 2;
-  const offsetY = anchorEl.offsetTop + anchorEl.offsetHeight / 2;
-
-  // world coordinates = card model position + offset
-  return { x: cardModel.x + offsetX, y: cardModel.y + offsetY };
+  const rectAnchor = anchorEl.getBoundingClientRect();
+  const rectViewport = stage.getBoundingClientRect(); // use stage bounding rect (stage is full screen)
+  const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
+  const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
+  // convert screen px to world coords (same mapping used throughout)
+  return { x: (ax - tx) / scale, y: (ay - ty) / scale };
 }
 
 function updateEdges() {
   // Clear existing
   while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
-
   edges.forEach(edge => {
     const aId = edge.a ? edge.a.card : (edge.from || null);
     const bId = edge.b ? edge.b.card : (edge.to || null);
@@ -303,9 +348,7 @@ function updateEdges() {
     const posA = anchorCenter(aCard.id);
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
-
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    // coordinates are in world space (wiresLayer is inside viewport which is transformed)
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
@@ -313,102 +356,104 @@ function updateEdges() {
     line.setAttribute("stroke", "#ffffff"); // solid white
     line.setAttribute("stroke-width", "4");
     line.setAttribute("stroke-linecap", "round");
-    line.setAttribute("opacity", "0.95");
+    line.setAttribute("opacity", "0.98");
     wiresLayer.appendChild(line);
   });
 }
 
-/* ==========================
-   Rendering: cards & textboxes
-   ========================== */
-function linkListHTML(files) {
-  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
-}
-
+/* ---------- Rendering cards & textboxes ---------- */
 function makeCardView(card) {
   const existing = document.getElementById(card.id);
   if (existing) existing.remove();
-
   const c = document.createElement('div');
   c.className = 'card';
   c.id = card.id;
+  // world coordinates -> CSS px
   c.style.left = card.x + 'px';
   c.style.top = card.y + 'px';
   c.style.setProperty('--branchGlow', card.data.branchColor || '#4caf50');
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
-
   const d = card.data;
   const barText = contrast(d.branchColor || '#777');
 
+  // Make file links clickable and allow them to be directly activated
+  const relatedHtml = (d.relatedFiles||[]).map(f => `<li><a class="card-file-link" href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+  const otherHtml = (d.otherFiles||[]).map(f => `<li><a class="card-file-link" href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+
   c.innerHTML = `
-    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor || '#777'}cc;">
+    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
     <div class="info">
-      <div class="name" style="color:${d.branchColor || '#ccc'}">${d.name || 'Unnamed'}</div>
+      <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
       <div class="rank">${d.rank || ''}</div>
-      <div class="bar" style="background:${d.branchColor || '#777'};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
+      <div class="bar" style="background:${d.branchColor};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
       <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
       <div class="desc">${d.desc || ''}</div>
       <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
-        ${linkListHTML(d.relatedFiles)}${linkListHTML(d.otherFiles)}
+        ${relatedHtml}${otherHtml}
       </ul>
     </div>
     <div class="anchor" title="Drag to link"></div>
   `;
 
-  // Make anchors clickable but stop propagation for link clicks
-  c.querySelectorAll('a').forEach(a=>{
-    a.addEventListener('click', e => { e.stopPropagation(); /* allow link navigation */ });
-  });
-
-  // Click to select (but don't open when editing text in textbox)
+  // If the user clicks a link inside the card, let it through (don't open editor)
   c.addEventListener('click', e => {
+    if (e.target.closest('a')) return; // allow hyperlink clicks to work
     e.stopPropagation();
     if (editingTextLabel) return;
-    if (selected){ const prev = document.getElementById(selected); if (prev) prev.classList.remove('selected'); }
-    selected = card.id; selectedType = 'card';
-    c.classList.add('selected');
+    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    selected = card.id; selectedType = 'card'; c.classList.add('selected');
     openEditor(card.id, 'card');
   });
 
-  // Dragging for cards (ignore anchor pointerdown)
+  // Dragging for cards (ignore pointerdown on anchor)
   let dragging = false;
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
-    if (e.target.classList.contains('anchor')) return; // anchor has its own handling
+    if(e.target.classList.contains('anchor')) return;
     e.stopPropagation();
     dragging = true;
     c.classList.add('dragging');
+    // disable selection while dragging
+    document.body.style.userSelect = 'none';
     c.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - card.x;
     offset.y = wp.y - card.y;
   });
   c.addEventListener('pointermove', e => {
-    if (!dragging) return;
+    if(!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
     card.x = snapToGrid(wp.x - offset.x);
     card.y = snapToGrid(wp.y - offset.y);
+    // keep card inside world
+    if (card.x < 0) card.x = 0;
+    if (card.y < 0) card.y = 0;
+    if (card.x + 360 > WORLD_W) card.x = WORLD_W - 360;
+    if (card.y + 120 > WORLD_H) card.y = WORLD_H - 120;
     c.style.left = card.x + 'px';
     c.style.top = card.y + 'px';
     updateEdges();
   });
   c.addEventListener('pointerup', e => {
-    if (!dragging) return;
+    if(!dragging) return;
     dragging = false;
     c.classList.remove('dragging');
-    try { c.releasePointerCapture(e.pointerId); } catch {}
+    document.body.style.userSelect = ''; // restore
+    try { c.releasePointerCapture(e.pointerId); } catch{}
     snapshot();
   });
   c.addEventListener('pointercancel', e => {
     dragging = false;
     c.classList.remove('dragging');
-    try { c.releasePointerCapture(e.pointerId); } catch {}
+    document.body.style.userSelect = ''; // restore
+    try { c.releasePointerCapture(e.pointerId); } catch{}
   });
 
   cardsLayer.appendChild(c);
   return c;
 }
 
+/* Single, consolidated textbox view with native textarea for smooth resizing */
 function makeTextBoxView(box) {
   const existing = document.getElementById(box.id);
   if (existing) existing.remove();
@@ -427,39 +472,55 @@ function makeTextBoxView(box) {
   if (box.height) textarea.style.height = box.height + 'px';
   textarea.spellcheck = false;
 
-  // Stop pointerdown from bubbling (prevents editor opening)
-  textarea.addEventListener('pointerdown', e => e.stopPropagation());
+  // Prevent textarea clicks/focus from opening editor
+  textarea.addEventListener('pointerdown', e => {
+    e.stopPropagation(); // stops stage/card click handlers
+  });
   textarea.addEventListener('focus', e => { editingTextLabel = true; });
   textarea.addEventListener('blur', e => { editingTextLabel = false; snapshot(); });
 
-  textarea.addEventListener('input', e => { box.content = textarea.value; });
+  // Keep model content in sync
+  textarea.addEventListener('input', e => {
+    box.content = textarea.value;
+  });
 
-  // Drag wrapper (only when not originating from textarea)
+  // Dragging wrapper (only when pointerdown outside of the textarea's scroll/resize grab)
   let dragging = false;
   let offset = {x:0,y:0};
   wrapper.addEventListener('pointerdown', e => {
-    if (e.target === textarea) return;
+    // If pointerdown originates from textarea (e.g. resize handle), do not start drag
+    if (e.target === textarea) {
+      // allow resize — but textarea pointerdown will have been stopped above
+      return;
+    }
     e.stopPropagation();
     dragging = true;
     wrapper.classList.add('dragging');
+    document.body.style.userSelect = 'none';
     wrapper.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - box.x;
     offset.y = wp.y - box.y;
   });
   wrapper.addEventListener('pointermove', e => {
-    if (!dragging) return;
+    if(!dragging) return;
     const wp = clientToWorld(e.clientX, e.clientY);
     box.x = snapToGrid(wp.x - offset.x);
     box.y = snapToGrid(wp.y - offset.y);
+    // clamp
+    if (box.x < 0) box.x = 0;
+    if (box.y < 0) box.y = 0;
+    if (box.x + (box.width || 300) > WORLD_W) box.x = WORLD_W - (box.width || 300);
+    if (box.y + 50 > WORLD_H) box.y = WORLD_H - 50;
     wrapper.style.left = box.x + 'px';
     wrapper.style.top = box.y + 'px';
     updateEdges();
   });
   wrapper.addEventListener('pointerup', e => {
-    if (dragging) {
+    if(dragging) {
       dragging = false;
       wrapper.classList.remove('dragging');
+      document.body.style.userSelect = '';
       try { wrapper.releasePointerCapture(e.pointerId); } catch {}
       snapshot();
     }
@@ -467,25 +528,28 @@ function makeTextBoxView(box) {
   wrapper.addEventListener('pointercancel', e => {
     dragging = false;
     wrapper.classList.remove('dragging');
+    document.body.style.userSelect = '';
     try { wrapper.releasePointerCapture(e.pointerId); } catch {}
   });
 
-  // Track resize via ResizeObserver
+  // Observe size changes (native resize) to keep model in sync
   const ro = new ResizeObserver(entries => {
     for(const ent of entries) {
       const w = Math.round(ent.contentRect.width);
       const h = Math.round(ent.contentRect.height);
-      box.width = w; box.height = h;
+      box.width = w;
+      box.height = h;
       wrapper.style.width = w + 'px';
-      snapshot();
+      snapshot(); // snapshot when resizing occurs
       updateEdges();
     }
   });
   ro.observe(textarea);
 
+  // Click wrapper to select and open editor (but clicking inside textarea will not reach here)
   wrapper.addEventListener('click', e => {
     e.stopPropagation();
-    if (selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
+    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
     selected = box.id; selectedType = 'textbox'; wrapper.classList.add('selected');
     openEditor(box.id, 'textbox');
   });
@@ -495,127 +559,109 @@ function makeTextBoxView(box) {
   return wrapper;
 }
 
-/* General render */
+/* ---------- General render ---------- */
 function render() {
-  // Clear and re-create
+  // Clear layers then recreate
   cardsLayer.innerHTML = '';
+  wiresLayer.innerHTML = '';
+  // re-create map border inside viewport sized elements
+  const mapBorder = document.getElementById('mapBorder');
+  if (mapBorder) {
+    mapBorder.style.width = WORLD_W + 'px';
+    mapBorder.style.height = WORLD_H + 'px';
+  }
   cards.forEach(makeCardView);
   textBoxes.forEach(makeTextBoxView);
   updateEdges();
 }
 
-/* ==========================
-   Snapshot / undo / redo
-   ========================== */
+/* ---------- Snapshot / undo / redo ---------- */
 function snapshot() {
   try {
+    // Deep clone current state
     const state = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(state);
     if (undoStack.length > 200) undoStack.shift();
     redoStack = [];
-  } catch (e) { console.warn("Snapshot failed", e); }
+  } catch (e) {
+    console.warn("Snapshot failed", e);
+  }
 }
+
 function loadState(state) {
   cards.splice(0, cards.length, ...(state.cards || []));
   edges.splice(0, edges.length, ...(state.edges || []));
   textBoxes.splice(0, textBoxes.length, ...(state.textBoxes || []));
-  tx = state.tx || 0; ty = state.ty || 0; scale = state.scale || 1;
+  tx = state.tx || 0;
+  ty = state.ty || 0;
+  scale = state.scale || 1;
+  clampViewport();
   applyTransform();
-  render();
+  render();   // re-render DOM after restoring state
 }
+
 function undo() {
   if (undoStack.length === 0) { toast("Nothing to undo"); return; }
   try {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     redoStack.push(current);
     const prev = undoStack.pop();
-    if (prev) loadState(prev);
+    loadState(prev);
     toast("Undo");
   } catch (e) { console.error(e); }
 }
+
 function redo() {
   if (redoStack.length === 0) { toast("Nothing to redo"); return; }
   try {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(current);
     const nxt = redoStack.pop();
-    if (nxt) loadState(nxt);
+    loadState(nxt);
     toast("Redo");
   } catch (e) { console.error(e); }
 }
 
-/* ==========================
-   Editor: selection, open/close
-   - fillRelatedSelect fetches DB groups and fills select box
-   ========================== */
+/* ---------- Selection / Editor ---------- */
 function deselect() {
   if (selected) {
-    const el = document.getElementById(selected);
-    if (el) el.classList.remove('selected');
+    let el = document.getElementById(selected);
+    if (el) el.classList.remove("selected");
     selected = null; selectedType = null;
   }
   closeEditor();
 }
 function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-async function fillRelatedSelect(selectedFiles = []) {
-  // Clear select
-  const sel = document.getElementById("fRelatedSelect");
-  sel.innerHTML = "";
-
-  // Paths to fetch from your DB
-  const paths = ["suspects", "insurgents", "informants"];
-  for (let p of paths) {
-    try {
-      const snap = await db.ref(p).once('value');
-      if (!snap.exists()) continue;
-      const group = document.createElement('optgroup');
-      group.label = p;
-      const val = snap.val();
-      // val could be object keyed by id
-      Object.keys(val).forEach(k=>{
-        const fileObj = val[k];
-        const opt = document.createElement('option');
-        opt.value = fileObj.url || fileObj; // support both url string or object
-        opt.textContent = fileObj.name || fileNameFromUrl(fileObj.url || fileObj);
-        // mark selected if already present in card's relatedFiles
-        if (selectedFiles && selectedFiles.some(s => s.url === opt.value)) opt.selected = true;
-        group.appendChild(opt);
-      });
-      sel.appendChild(group);
-    } catch (e) {
-      console.warn("Failed to fetch", p, e);
-    }
-  }
-}
-
 async function openEditor(id, type) {
-  const ed = document.getElementById("editor");
+  let ed = document.getElementById("editor");
   ed.style.display = "block";
 
-  // Reset visible and values
-  document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
+  // Reset all fields
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
-  fillRankSelect("None","None");
+  fillRankSelect("None", "None");
   document.getElementById("fSubbranch").value = "";
   document.getElementById("fStatus").value = "Unknown";
   document.getElementById("fDesc").value = "";
-  document.getElementById("relatedList").innerHTML = "(none)";
+
+  // Get the card if type=card
+  const card = (type === "card") ? cards.find(c => c.id === id) : null;
+
+  // Populate related files select from Firebase (preselect if card has relatedFiles)
+  await fillRelatedSelect(card ? (card.data.relatedFiles || []) : []);
+
+  // Reset other fields
   document.getElementById("otherList").innerHTML = "(none)";
-  document.getElementById("fRelatedUrl").value = "";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
 
-  selected = id; selectedType = type;
+  selected = id;
+  selectedType = type;
 
-  if (type === "card") {
-    const card = cards.find(c => c.id === id);
-    // populate related select from DB, with existing selection:
-    await fillRelatedSelect(card ? (card.data.relatedFiles || []) : []);
-
-    if (!card) return;
+  if (type === "card" && card) {
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = ""); // show all controls
     document.getElementById("fImage").value = card.data.image || "";
     document.getElementById("fName").value = card.data.name || "";
     fillBranchSelect(card.data.branch);
@@ -623,15 +669,18 @@ async function openEditor(id, type) {
     document.getElementById("fSubbranch").value = card.data.subbranch || "";
     document.getElementById("fStatus").value = card.data.status || "Unknown";
     document.getElementById("fDesc").value = card.data.desc || "";
-    renderFileList("relatedList", card.data.relatedFiles);
     renderFileList("otherList", card.data.otherFiles);
   } else if (type === "textbox") {
     // Hide everything except header + description label + textarea
     document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
     document.querySelector("#editor header").style.display = "block";
-    const descLabel = Array.from(document.querySelectorAll("#editor label")).find(l => l.textContent.includes("Short Description"));
+
+    const descLabel = Array.from(document.querySelectorAll("#editor label"))
+      .find(l => l.textContent.includes("Short Description"));
     if (descLabel) descLabel.style.display = "block";
+
     document.getElementById("fDesc").style.display = "block";
+
     const box = textBoxes.find(t => t.id === id);
     if (box) document.getElementById("fDesc").value = box.content || "";
   }
@@ -640,7 +689,7 @@ async function openEditor(id, type) {
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
-  Object.keys(branchColors).forEach(b=>{
+  Object.keys(branchColors).forEach(b => {
     const opt = document.createElement("option");
     opt.value = b; opt.textContent = b;
     if (b === selectedBranch) opt.selected = true;
@@ -650,59 +699,43 @@ function fillBranchSelect(selectedBranch) {
 function fillRankSelect(branch, selectedRank) {
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
-  (rankLists[branch] || ['None']).forEach(r=>{
+  (rankLists[branch] || ['None']).forEach(r => {
     const opt = document.createElement("option");
     opt.value = r; opt.textContent = r;
     if (r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
 }
-function renderFileList(containerId, files){
+function renderFileList(containerId, files) {
   const cont = document.getElementById(containerId);
   cont.innerHTML = "";
-  if (!files || files.length === 0) { cont.textContent = "(none)"; return; }
+  if (!files || files.length === 0) {
+    cont.textContent = "(none)";
+    return;
+  }
   const ul = document.createElement('ul');
   ul.style.margin = '6px 0 0 0';
   ul.style.paddingLeft = '18px';
-  files.forEach(f=>{
+  files.forEach(f => {
     const li = document.createElement('li');
     const a = document.createElement("a");
     a.href = f.url || f;
     a.textContent = f.name || fileNameFromUrl(f.url || f);
     a.target = "_blank"; a.rel = "noopener";
-    // clicking link should not open editor so stop propagation
-    a.addEventListener('click', (e)=> e.stopPropagation());
     li.appendChild(a);
     ul.appendChild(li);
   });
   cont.appendChild(ul);
 }
 
-/* Add related URL (manual) */
-document.getElementById("btnAddRelated").onclick = ()=>{
-  if(!selected || selectedType !== 'card') { alert("No card selected"); return; }
-  const url = document.getElementById("fRelatedUrl").value.trim();
-  if (!url) return alert("Enter URL");
-  const card = cards.find(c => c.id === selected);
-  if (!card) return;
-  card.data.relatedFiles = card.data.relatedFiles || [];
-  const name = fileNameFromUrl(url);
-  if (!card.data.relatedFiles.some(f=>f.url === url)) {
-    card.data.relatedFiles.push({url, name});
-    renderFileList("relatedList", card.data.relatedFiles);
-    document.getElementById("fRelatedUrl").value = "";
-    snapshot();
-  }
-};
-
-/* Other file add (manual) */
+// Editor: Add other URL
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') { alert("No card selected"); return; }
+  if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if (!url) return alert("Enter URL");
-  const card = cards.find(c => c.id === selected);
-  if (!card) return;
+  if(!url) return alert("Please enter a URL");
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
   card.data.otherFiles.push({url, name});
   renderFileList("otherList", card.data.otherFiles);
@@ -711,18 +744,12 @@ document.getElementById("btnAddOther").onclick = ()=>{
   snapshot();
 };
 
-/* Save/cancel */
+// Save/cancel in editor
 document.getElementById("btnSave").onclick = ()=>{
   if(!selected) return;
-  if (selectedType === 'card') {
-    const card = cards.find(c => c.id === selected);
-    if (!card) return;
-
-    // Read selected related files from fRelatedSelect
-    const sel = document.getElementById("fRelatedSelect");
-    const chosen = Array.from(sel.selectedOptions).map(o=>({ url: o.value, name: o.textContent }));
-    card.data.relatedFiles = chosen;
-
+  if(selectedType === 'card'){
+    const card = cards.find(c=>c.id === selected);
+    if(!card) return;
     card.data.image = document.getElementById("fImage").value.trim();
     card.data.name = document.getElementById("fName").value.trim();
     card.data.branch = document.getElementById("fBranch").value;
@@ -731,19 +758,22 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.status = document.getElementById("fStatus").value;
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
-    // re-render card
+    // related files: take selected options from fRelatedSelect
+    const sel = document.getElementById("fRelatedSelect");
+    card.data.relatedFiles = Array.from(sel.selectedOptions).map(opt => ({ url: opt.value, name: opt.textContent }));
+    // Re-render card
     const oldEl = document.getElementById(card.id);
-    if (oldEl) oldEl.remove();
+    if(oldEl) oldEl.remove();
     makeCardView(card);
     updateEdges();
-  } else if (selectedType === 'textbox') {
+  } else if(selectedType === 'textbox'){
     const box = textBoxes.find(t => t.id === selected);
-    if (!box) return;
+    if(!box) return;
     box.content = document.getElementById("fDesc").value.trim();
     const oldEl = document.getElementById(box.id);
-    if (oldEl) {
+    if(oldEl){
       const ta = oldEl.querySelector('textarea');
-      if (ta) ta.value = box.content;
+      if(ta) ta.value = box.content;
     }
   }
   closeEditor();
@@ -753,24 +783,13 @@ document.getElementById("btnSave").onclick = ()=>{
 document.getElementById("btnCancel").onclick = closeEditor;
 document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
 
-/* ==========================
-   Create default elements
-   - createDefaultCard now places at camera center if provided pos is 'center'
-   ========================== */
-function viewportCenterWorld() {
-  const rect = stage.getBoundingClientRect();
-  const centerClientX = rect.left + rect.width / 2;
-  const centerClientY = rect.top + rect.height / 2;
-  return clientToWorld(centerClientX, centerClientY);
-}
-
+/* ---------- Create new elements ---------- */
 function createDefaultCard(pos){
   const id = "c" + Math.random().toString(36).slice(2,9);
-  const base = (pos === 'center') ? viewportCenterWorld() : pos;
   const newCard = {
     id,
-    x: snapToGrid((base.x || 100) - 180),
-    y: snapToGrid((base.y || 100) - 90),
+    x: snapToGrid(pos.x - 180),
+    y: snapToGrid(pos.y - 45), // center vertically a bit
     data: {
       image: "https://i.ibb.co/zhKnjbh1/unknownperson.png",
       name: "New Profile",
@@ -784,43 +803,49 @@ function createDefaultCard(pos){
       branchColor: branchColors["None"],
     },
   };
+  // clamp inside world
+  if (newCard.x < 0) newCard.x = 0;
+  if (newCard.y < 0) newCard.y = 0;
+  if (newCard.x + 360 > WORLD_W) newCard.x = WORLD_W - 360;
+  if (newCard.y + 120 > WORLD_H) newCard.y = WORLD_H - 120;
   return newCard;
 }
 function createDefaultTextbox(pos){
   const id = "t" + Math.random().toString(36).slice(2,9);
-  return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300, height: null };
+  let x = snapToGrid(pos.x);
+  let y = snapToGrid(pos.y);
+  if (x < 0) x = 0;
+  if (y < 0) y = 0;
+  return { id, x, y, content: "", width: 300, height: null };
 }
 
-/* ==========================
-   Toolbar bindings
-   ========================== */
+/* ---------- Toolbar bindings ---------- */
 document.getElementById("addProfileBtn").onclick = ()=>{
-  const newCard = createDefaultCard('center'); // spawn at camera center
+  // spawn at current camera center
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const center = clientToWorld(vw/2, vh/2);
+  const newCard = createDefaultCard(center);
   cards.push(newCard);
   selected = newCard.id; selectedType = 'card';
-  makeCardView(newCard);
-  snapshot();
-  render();
-  openEditor(newCard.id, 'card');
+  makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 };
 document.getElementById("addTextBtn").onclick = ()=>{
-  const pos = viewportCenterWorld();
-  const newBox = createDefaultTextbox(pos);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const center = clientToWorld(vw/2, vh/2);
+  const newBox = createDefaultTextbox(center);
   textBoxes.push(newBox);
   selected = newBox.id; selectedType = 'textbox';
   makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
 };
+
 document.getElementById("deleteSelectedBtn").onclick = async function(){
   if(!selected) { toast("Select a card or textbox first"); return; }
   const confirmed = await customConfirm("Delete selected item?");
   if(!confirmed) return;
+
   if(selectedType === "card"){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
-    edges = edges.filter(e => {
-      const aId = e.a ? e.a.card : (e.from || null);
-      const bId = e.b ? e.b.card : (e.to || null);
-      return aId !== selected && bId !== selected;
-    });
+    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
   } else if(selectedType === "textbox"){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
   }
@@ -829,15 +854,15 @@ document.getElementById("deleteSelectedBtn").onclick = async function(){
   selected = null; selectedType = null;
   closeEditor(); render(); snapshot();
 };
+
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
-/* ==========================
-   Stage interactions (dblclick add, search)
-   ========================== */
+/* ---------- Stage interactions ---------- */
+// Double-click stage to add a card (guard when editing text)
 stage.addEventListener("dblclick", e=>{
   if (editingTextLabel) return;
-  if (e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
+  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
   const pos = clientToWorld(e.clientX, e.clientY);
   const newCard = createDefaultCard(pos);
   cards.push(newCard);
@@ -845,6 +870,7 @@ stage.addEventListener("dblclick", e=>{
   makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 });
 
+// Search filtering + focus single-match
 document.getElementById("searchBox").oninput = function(){
   const query = this.value.toLowerCase();
   let matches = [];
@@ -862,6 +888,7 @@ document.getElementById("searchBox").oninput = function(){
     const text = (box.content || "").toLowerCase();
     el.style.display = !query || text.includes(query) ? "block" : "none";
   });
+
   if (matches.length === 1) focusCard(matches[0]);
 };
 
@@ -869,20 +896,17 @@ function focusCard(card){
   const el = document.getElementById(card.id);
   if(!el) return;
   const rect = stage.getBoundingClientRect();
-  const cardCenterX = card.x + 180;
+  const cardCenterX = card.x + 180; // half of 360 width
   const cardCenterY = card.y + 90;
   tx = rect.width / 2 - cardCenterX * scale;
   ty = rect.height / 2 - cardCenterY * scale;
+  clampViewport();
   applyTransform();
   updateEdges();
-  el.classList.remove('flash-highlight');
-  void el.offsetWidth;
-  el.classList.add('flash-highlight');
+  el.classList.remove('flash-highlight'); void el.offsetWidth; el.classList.add('flash-highlight');
 }
 
-/* ==========================
-   Zoom & pan
-   ========================== */
+/* ---------- Zoom ---------- */
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
@@ -891,57 +915,68 @@ stage.addEventListener('wheel', e => {
   scale = Math.min(Math.max(scale, 0.25), 4);
   tx = e.clientX - mousePos.x * scale;
   ty = e.clientY - mousePos.y * scale;
+  clampViewport();
   applyTransform();
+  updateEdges();
 }, { passive: false });
 
+// Panning
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let panOrigin = { tx: 0, ty: 0 };
 stage.addEventListener('pointerdown', e => {
   if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
   isPanning = true;
-  panStart.x = e.clientX; panStart.y = e.clientY;
-  panOrigin.tx = tx; panOrigin.ty = ty;
+  panStart.x = e.clientX;
+  panStart.y = e.clientY;
+  panOrigin.tx = tx;
+  panOrigin.ty = ty;
   stage.style.cursor = 'grabbing';
   stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e => {
   if (!isPanning) return;
-  const dx = e.clientX - panStart.x, dy = e.clientY - panStart.y;
-  tx = panOrigin.tx + dx; ty = panOrigin.ty + dy;
+  const dx = e.clientX - panStart.x;
+  const dy = e.clientY - panStart.y;
+  tx = panOrigin.tx + dx;
+  ty = panOrigin.ty + dy;
+  clampViewport();
   applyTransform();
+  updateEdges();
 });
 stage.addEventListener('pointerup', e => {
   if (!isPanning) return;
-  isPanning = false; stage.style.cursor = 'grab';
-  try { stage.releasePointerCapture(e.pointerId); } catch {}
+  isPanning = false;
+  stage.style.cursor = 'grab';
+  try { stage.releasePointerCapture(e.pointerId); } catch{}
   snapshot();
 });
 stage.addEventListener('pointercancel', e => {
   if (!isPanning) return;
-  isPanning = false; stage.style.cursor = 'grab';
-  try { stage.releasePointerCapture(e.pointerId); } catch {}
+  isPanning = false;
+  stage.style.cursor = 'grab';
+  try { stage.releasePointerCapture(e.pointerId); } catch{}
   snapshot();
 });
 
-/* ==========================
-   Anchor linking (create edges)
-   - uses model-world anchorCenter positions so lines stay attached during zoom/pan
-   ========================== */
+/* ---------- Anchor linking (create edges) ---------- */
 let anchorDrag = { active:false, startCardId:null, tmpLine:null };
 
 stage.addEventListener('pointerdown', e => {
   if (e.target.classList.contains('anchor')) {
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
+
     anchorDrag.active = true;
     anchorDrag.startCardId = cardEl.id;
+
     const svgNS = "http://www.w3.org/2000/svg";
     anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
-    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff'); // white line
     anchorDrag.tmpLine.setAttribute('stroke-width', '3');
     anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(anchorDrag.tmpLine);
+
     const startPos = anchorCenter(anchorDrag.startCardId);
     if (startPos) {
       anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -949,6 +984,7 @@ stage.addEventListener('pointerdown', e => {
       anchorDrag.tmpLine.setAttribute('x2', startPos.x);
       anchorDrag.tmpLine.setAttribute('y2', startPos.y);
     }
+
     try { e.target.setPointerCapture(e.pointerId); } catch {}
   }
 });
@@ -968,58 +1004,72 @@ stage.addEventListener('pointermove', e => {
 stage.addEventListener('pointerup', e => {
   if (!anchorDrag.active) return;
   anchorDrag.active = false;
+
   let targetCard = null;
   const el = document.elementFromPoint(e.clientX, e.clientY);
   if (el) {
     const cardEl = el.closest('.card');
     if (cardEl) targetCard = cardEl.id;
   }
+
   if (!targetCard || targetCard === anchorDrag.startCardId) {
-    if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
+    if (anchorDrag.tmpLine) {
+      anchorDrag.tmpLine.remove();
+      anchorDrag.tmpLine = null;
+    }
     try { e.target.releasePointerCapture(e.pointerId); } catch {}
     return;
   }
+
   // Prevent duplicate edges
-  const exists = edges.some(edge=>{
-    const aId = edge.a ? edge.a.card : (edge.from || null);
-    const bId = edge.b ? edge.b.card : (edge.to || null);
-    return (aId === anchorDrag.startCardId && bId === targetCard) || (aId === targetCard && bId === anchorDrag.startCardId);
-  });
-  if (!exists) {
-    const newEdge = { id: "e" + Math.random().toString(36).slice(2,9), a: { card: anchorDrag.startCardId }, b: { card: targetCard } };
+  if (!edges.some(edge =>
+    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
+    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
+  )) {
+    const newEdge = {
+      id: "e" + Math.random().toString(36).slice(2,9),
+      a: { card: anchorDrag.startCardId },
+      b: { card: targetCard }
+    };
     edges.push(newEdge);
-    updateEdges(); snapshot(); render();
+    updateEdges();
+    snapshot();
+    render();
   }
-  if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
+
+  if (anchorDrag.tmpLine) {
+    anchorDrag.tmpLine.remove();
+    anchorDrag.tmpLine = null;
+  }
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
 
-/* Deselect click on stage background */
+/* ---------- Deselect on stage click ---------- */
 stage.addEventListener("click", e=>{
-  if (e.target === stage || e.target === viewport) {
-    if (selected) {
+  if(e.target === stage || e.target === viewport){
+    if(selected){
       const el = document.getElementById(selected);
-      if (el) el.classList.remove('selected');
+      if(el) el.classList.remove("selected");
       selected = null; selectedType = null; closeEditor();
     }
   }
 });
 
-/* ==========================
-   Firebase save/load/list
-   ========================== */
+/* ---------- Firebase: save/load/delete & web list ---------- */
 const webNameInput = document.getElementById('webNameInput');
 const webListDropdown = document.getElementById('webListDropdown');
 let currentWebListener = null;
 
 async function subscribeToWeb(name) {
-  if (currentWebListener && webListDropdown.value) {
-    db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+  if (currentWebListener) {
+    if(webListDropdown.value) {
+      db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
+    }
     currentWebListener = null;
   }
-  if (!name) return;
+  if(!name) return;
   const ref = db.ref(`connectionWebs/${name}`);
-  currentWebListener = ref.on('value', snapshot=>{
+  currentWebListener = ref.on('value', snapshot => {
     const data = snapshot.val();
     if (!data) {
       toast(`No data found for "${name}"`);
@@ -1028,16 +1078,16 @@ async function subscribeToWeb(name) {
       render();
       return;
     }
-    // restore
+    // Restore saved state
     cards.splice(0, cards.length, ...(data.cards || []));
     edges.splice(0, edges.length, ...(data.edges || []));
     textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
-    tx = (typeof data.tx === 'number') ? data.tx : 0;
-    ty = (typeof data.ty === 'number') ? data.ty : 0;
-    scale = data.scale || 1;
-    applyTransform(); render();
+    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
+    clampViewport();
+    applyTransform();
+    render();
     toast(`Synced with "${name}"`);
-  }, error => alert("Realtime sync failed: " + (error && error.message)));
+  }, error => { alert("Realtime sync failed: " + error.message); });
 }
 
 webListDropdown.addEventListener("change", (e) => {
@@ -1052,40 +1102,21 @@ webNameInput.addEventListener("change", (e) => {
   if (!name) return;
   localStorage.setItem("lastWeb", name);
   subscribeToWeb(name);
-  if (!Array.from(webListDropdown.options).some(opt=>opt.value === name)) {
-    const opt = document.createElement('option');
+  if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
+    const opt = document.createElement("option");
     opt.value = name; opt.textContent = name;
     webListDropdown.appendChild(opt);
     webListDropdown.value = name;
   }
 });
 
-async function refreshWebList() {
-  try {
-    const snapshot = await db.ref('connectionWebs').once('value');
-    const data = snapshot.val() || {};
-    webListDropdown.innerHTML = "";
-    Object.keys(data).sort().forEach(name=>{
-      const opt = document.createElement('option'); opt.value = name; opt.textContent = name;
-      webListDropdown.appendChild(opt);
-    });
-    const last = localStorage.getItem("lastWeb");
-    if (last && data[last]) {
-      webListDropdown.value = last; webNameInput.value = last; subscribeToWeb(last);
-    }
-  } catch (e) { console.error(e); }
-}
-
 async function saveCurrentWeb() {
   const name = webNameInput.value.trim();
   if (!name) { alert("Enter a Connection Web name"); return; }
-  // Deep clone state
+  // Deep-clone to strip any DOM references
   const data = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() }));
-  try {
-    await db.ref(`connectionWebs/${name}`).set(data);
-    toast("Connection Web saved!");
-    await refreshWebList();
-  } catch (e) { alert("Save failed: " + e.message); }
+  try { await db.ref(`connectionWebs/${name}`).set(data); toast("Connection Web saved!"); }
+  catch (e) { alert("Save failed: " + e.message); }
 }
 async function deleteCurrentWeb() {
   const name = webListDropdown.value;
@@ -1099,47 +1130,68 @@ async function deleteCurrentWeb() {
     await refreshWebList();
   } catch (e) { alert("Delete failed: " + e.message); }
 }
+async function refreshWebList() {
+  try {
+    const snapshot = await db.ref('connectionWebs').once('value');
+    const data = snapshot.val() || {};
+    webListDropdown.innerHTML = "";
+    Object.keys(data).sort().forEach(name => {
+      const opt = document.createElement("option");
+      opt.value = name; opt.textContent = name;
+      webListDropdown.appendChild(opt);
+    });
+    let last = localStorage.getItem("lastWeb");
+    if (last && data[last]) {
+      webListDropdown.value = last;
+      webNameInput.value = last;
+      subscribeToWeb(last);
+    }
+  } catch (e) { console.error("Failed to load Connection Webs list:", e); }
+}
 document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
 document.getElementById("loadWebBtn").onclick = () => {
   const name = webListDropdown.value || webNameInput.value.trim();
-  if (!name) { alert("Pick or type a web name to load"); return; }
+  if(!name) { alert("Pick or type a web name to load"); return; }
   subscribeToWeb(name);
 };
 document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
 
-/* ==========================
-   Custom confirm modal
-   ========================== */
+/* ---------- Misc ---------- */
+// Deselect on background / stage click (extra)
+document.addEventListener("click", (e) => {
+  if (e.target.closest('#toolbar') || e.target.closest('#editor')) return;
+}, false);
+
 function customConfirm(message) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const modal = document.getElementById("confirmModal");
     const msgEl = document.getElementById("confirmMessage");
     const yesBtn = document.getElementById("confirmYesBtn");
     const noBtn = document.getElementById("confirmNoBtn");
+
     msgEl.textContent = message;
     modal.style.display = "flex";
-    const cleanup = ()=>{ modal.style.display = "none"; yesBtn.onclick = null; noBtn.onclick = null; };
-    yesBtn.onclick = ()=>{ cleanup(); resolve(true); };
-    noBtn.onclick = ()=>{ cleanup(); resolve(false); };
+
+    const cleanup = () => {
+      modal.style.display = "none";
+      yesBtn.onclick = null;
+      noBtn.onclick = null;
+    };
+
+    yesBtn.onclick = () => { cleanup(); resolve(true); };
+    noBtn.onclick = () => { cleanup(); resolve(false); };
   });
 }
 
-/* ==========================
-   Init
-   ========================== */
+// Initialize
 document.addEventListener("DOMContentLoaded", ()=>{
   refreshWebList();
   render();
+  // initial snapshot
   snapshot();
 });
 
-/* Prevent unwanted selection from interfering */
-document.addEventListener('selectstart', e => {
-  // prevent selection on cards area -- allow selection for textarea inside textbox
-  if (e.target.closest('.card') || e.target.closest('.textbox-wrapper')) e.preventDefault();
-}, false);
-
-/* Keyboard shortcuts */
+// Keyboard shortcuts: Ctrl+Z / Ctrl+Y
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
