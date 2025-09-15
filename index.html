@@ -260,6 +260,17 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <button id="btnCancel" type="button">Cancel</button>
   </div>
 </div>
+<!-- Custom Confirm Modal -->
+<div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); 
+     z-index:1000000; justify-content:center; align-items:center;">
+  <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
+    <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
+    <div style="display:flex; justify-content:space-between; gap:10px;">
+      <button id="confirmYesBtn" style="flex:1; background:#c62828; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">Yes</button>
+      <button id="confirmNoBtn" style="flex:1; background:#444; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:600; cursor:pointer;">No</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // Firebase config - replace if different
@@ -899,20 +910,23 @@ document.getElementById("addTextBtn").onclick = ()=>{
   selected = newBox.id; selectedType = 'textbox';
   makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
 };
-document.getElementById("deleteSelectedBtn").onclick = function(){
-  if(!selected) { alert("Select a card or textbox first"); return; }
-  if(!confirm("Delete selected item?")) return;
+document.getElementById("deleteSelectedBtn").onclick = async function(){
+  if(!selected) { toast("Select a card or textbox first"); return; }
+  const confirmed = await customConfirm("Delete selected item?");
+  if(!confirmed) return;
+
   if(selectedType === "card"){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
-    // Remove edges connected to this card
     edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
   } else if(selectedType === "textbox"){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
   }
   const el = document.getElementById(selected);
   if(el) el.remove();
-  selected = null; selectedType = null; closeEditor(); render(); snapshot();
+  selected = null; selectedType = null;
+  closeEditor(); render(); snapshot();
 };
+
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
@@ -1237,6 +1251,26 @@ document.addEventListener("DOMContentLoaded", ()=>{
   // initial snapshot
   snapshot();
 });
+function customConfirm(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("confirmModal");
+    const msgEl = document.getElementById("confirmMessage");
+    const yesBtn = document.getElementById("confirmYesBtn");
+    const noBtn = document.getElementById("confirmNoBtn");
+
+    msgEl.textContent = message;
+    modal.style.display = "flex";
+
+    const cleanup = () => {
+      modal.style.display = "none";
+      yesBtn.onclick = null;
+      noBtn.onclick = null;
+    };
+
+    yesBtn.onclick = () => { cleanup(); resolve(true); };
+    noBtn.onclick = () => { cleanup(); resolve(false); };
+  });
+}
 
 // Keyboard shortcuts: Ctrl+Z / Ctrl+Y
 document.addEventListener('keydown', (e) => {
