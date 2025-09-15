@@ -50,19 +50,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .alive { background:#4caf50; }
 .dead { background:#e53935; }
 .unknown { background:#212121; border:1.5px solid #78909c; }
-.anchor {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #ffd54f;
-  border: 2px solid #333;
-  top: 0px;                   /* relative to card’s top edge */
-  left: 50%;
-  transform: translate(-50%, -100%); /* center horizontally, lift fully above card */
-  z-index: 20;
-  cursor: crosshair;
-}
+.anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20; cursor:crosshair; }
 
 
 /* Editor side panel */
