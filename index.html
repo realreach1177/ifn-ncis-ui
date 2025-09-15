@@ -9,7 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
 <style>
-html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden; }
+/* Base */
+html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
+
 /* Toolbar (merged) */
 #toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
 .toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
@@ -21,35 +23,34 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 #deleteWebBtn { background:#c62828; color:#fff; }
 #webListDropdown, #webNameInput, #searchBox { background:#333; color:#eee; }
 
-/* Stage & fixed grid (grid stays visually fixed while viewport is transformed) */
-#stage { position:absolute; inset:0; overflow:hidden; background:#141414; cursor:grab;
+/* Stage wrapper centers the world and constrains map size */
+#stageWrap { position:absolute; inset:0; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#000; }
+#stage { position:relative; width:5000px; height:2000px; background:#141414; cursor:grab; overflow:visible;
   background-image:
     linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
   background-size:40px 40px;
+  box-sizing:border-box;
+  border: 8px solid #000; /* black border edge */
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.6) inset;
 }
 
-/* viewport is the container that we translate/scale */
+/* viewport transforms the world (translate + scale) */
 #viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
-
-/* world is the map canvas that has the hard black border and fixed pixel dimensions */
-#world { position:absolute; left:0; top:0; width:3000px; height:1000px; border:6px solid #000; background:transparent; box-sizing:border-box; overflow:visible; }
-
-/* Wires & cards are sized to world */
 #wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1; }
 #cards { position:absolute; left:0; top:0; width:100%; height:100%; }
 
 /* Cards and textboxes */
+/* disable text-selection while dragging across UI; allow text selection only in textareas/inputs */
 .card, .textbox-wrapper {
   position:absolute; padding:0; box-sizing:border-box;
-  /* prevent accidental selection while dragging */
   user-select:none; cursor:grab; z-index:10; transition:box-shadow 0.15s;
 }
 .card {
   position:relative; width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:visible;
 }
-.textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
-.textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, Segoe UI, Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; user-select:text; }
+.textbox-wrapper { background:transparent; border-radius:8px; padding:6px; user-select:none; }
+.textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, "Segoe UI", Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; user-select:text; }
 .card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50); }
 .card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
 .img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
@@ -58,18 +59,22 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
 .bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
 .status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
-.dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
+.dot { width:12px; height:12px; border-radius:50%; display:inline-block;}
 .alive { background:#4caf50; } .dead { background:#e53935; } .unknown { background:#212121; border:1.5px solid #78909c; }
 
-/* Anchor (slightly above top center of card) */
+/* Anchor dot: top slightly above card, but not clipped (card overflow visible) */
 .anchor {
-  position:absolute; width:16px; height:16px; border-radius:50%; background:#ffffff; border:2px solid #000000;
-  top:-10px; left:50%; transform:translateX(-50%); z-index:9999; cursor:crosshair;
+  position:absolute;
+  width:16px; height:16px; border-radius:50%;
+  background:#ffffff;
+  border:2px solid #000000;
+  top:-10px; left:50%;
+  transform:translateX(-50%);
+  z-index:9999; cursor:crosshair;
 }
 
 /* Editor side panel */
-#editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
-  box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
+#editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee; box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
 #editor header { font-weight:900; font-size:18px; padding-bottom:12px; }
 #editor label { font-size:12px; margin-top:10px; display:block; color:#bbb; }
 #editor input, #editor select, #editor textarea { width:100%; background:#222; color:#eee; border-radius:6px; border:none; padding:8px 10px; font-size:14px; }
@@ -77,19 +82,21 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 #editor .btns { margin-top:14px; display:flex; gap:10px; }
 #editor .btns button { flex:1; font-weight:700; font-size:15px; border-radius:6px; border:none; cursor:pointer; padding:10px; background:#2196f3; color:#fff; transition: background 0.3s; }
 #editor .btns button:hover { background:#1769aa; }
-#editor .btns button.save { background:#4caf50; }
-#editor .btns button.save:hover { background:#388e3c; }
+#editor .btns button.save { background:#4caf50; } #editor .btns button.save:hover { background:#388e3c; }
 .file-list { max-height:120px; overflow-y:auto; color:#88aacc; font-size:13px; padding-left:15px; margin-top:6px; }
-.file-list a { color:#74b9ff; text-decoration:none; }
-.file-list a:hover { text-decoration:underline; }
+.file-list a { color:#74b9ff; text-decoration:none; } .file-list a:hover { text-decoration:underline; }
 
 /* Toasts */
-.toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
-  box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
+.toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px; box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
 
-/* flash highlight for search focus */
-@keyframes flash { 0%{ box-shadow:0 0 0 0 rgba(255,215,0,0.9);} 50%{ box-shadow:0 0 25px 8px rgba(255,215,0,0.9);} 100%{ box-shadow:0 0 0 0 rgba(255,215,0,0); } }
-.flash-highlight { animation: flash 1s ease-out 2; }
+/* small helpers */
+.optgroupLabel { font-weight:700; color:#ccc; }
+
+/* responsive small screens: shrink toolbar */
+@media (max-width:720px){
+  #toolbar { width:96%; gap:6px; padding:8px; }
+  .toolbar-left button, .toolbar-right button { padding:6px 8px; font-size:13px; }
+}
 </style>
 </head>
 <body>
@@ -111,15 +118,17 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
   </div>
 </div>
-<!-- Stage -->
-<div id="stage">
-  <div id="viewport">
-    <div id="world">
+
+<!-- Stage wrapper centers the world map -->
+<div id="stageWrap">
+  <div id="stage">
+    <div id="viewport">
       <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
       <div id="cards"></div>
     </div>
   </div>
 </div>
+
 <!-- Editor -->
 <div id="editor">
   <header>Edit Item</header>
@@ -149,9 +158,18 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
 
-  <label>Related Files (choose from DB)</label>
-  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;"></select>
-  <div id="relatedChoiceHelp" style="color:#99aabb; font-size:12px; margin-top:6px;">(sourced from suspects, insurgents, informants)</div>
+  <label>Related Files</label>
+  <!-- multi-select populated from Firebase (suspects/insurgents/informants) -->
+  <select id="fRelatedSelect" multiple size="8" style="width:100%; margin-top:6px;"></select>
+  <div style="font-size:12px;color:#99aabb;margin-top:6px;">Select any existing files from DB to link to this profile. You can still add external URLs below.</div>
+
+  <label style="margin-top:8px;">Related External URL</label>
+  <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" />
+  <input id="fRelatedName" type="text" placeholder="Display name for hyperlink" />
+  <div style="display:flex; gap:8px; margin-top:6px;">
+    <button id="btnAddRelated" type="button">Add URL</button>
+  </div>
+  <div id="relatedList" class="file-list">(none)</div>
 
   <label>Other Files (external URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
@@ -168,8 +186,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 </div>
 
 <!-- Custom Confirm Modal -->
-<div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); 
-     z-index:1000000; justify-content:center; align-items:center;">
+<div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000000; justify-content:center; align-items:center;">
   <div style="background:#222; padding:20px; border-radius:10px; max-width:300px; text-align:center; color:#eee;">
     <p id="confirmMessage" style="margin-bottom:20px;">Are you sure?</p>
     <div style="display:flex; justify-content:space-between; gap:10px;">
@@ -180,7 +197,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 </div>
 
 <script>
-// Firebase config - keep same key you provided
+// ------------------- Firebase init -------------------
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -196,7 +213,7 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// App state
+// ------------------- App state -------------------
 let cards = [];
 let edges = [];
 let textBoxes = [];
@@ -205,16 +222,11 @@ let selectedType = null; // 'card' or 'textbox'
 let scale = 1, tx = 0, ty = 0;
 let undoStack = [];
 let redoStack = [];
-let snap = 10;
+const snap = 10;
 let editingTextLabel = false;
-
-// world size (hard-coded per request)
-const WORLD_WIDTH = 3000;
-const WORLD_HEIGHT = 1000;
 
 const viewport = document.getElementById('viewport');
 const stage = document.getElementById('stage');
-const world = document.getElementById('world');
 const cardsLayer = document.getElementById('cards');
 const wiresLayer = document.getElementById('wires');
 
@@ -230,126 +242,103 @@ const branchColors = {
 };
 const rankLists = {
   "None":["None"],
-  "United States Army": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"
-  ],
-  "United States Navy": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"
-  ],
-  "United States Marine Corps": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"
-  ],
-  "United States Air Force": [
-    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"
-  ],
-  "Taliban": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
-  ],
-  "Taliban Special Forces": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"
-  ],
-  "Al-Qaeda": [
-    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
-  ]
+  "United States Army": ["US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","SMA","CSM","1SG","SFC","SSGT","SGT","CPL","PFC","PV2","PVT"],
+  "United States Navy": ["US General","US Lieutenant General","US Major General","Commander","XO","CAPT","CDR","LCDR","LT","LTJG","ENS","MCPON","MCPO","SCPO","CPO","PO1","PO2","PO3","SN","SA","SR"],
+  "United States Marine Corps": ["US General","US Lieutenant General","US Major General","Commander","XO","COL","LtCol","Maj","Cpt","1stLt","2ndLt","SgtMajMC","MGySgt","MSgt","GySgt","SSgt","Sgt","Cpl","LCpl","PFC","Pvt"],
+  "United States Air Force": ["US General","US Lieutenant General","US Major General","Commander","XO","COL","LTC","MAJ","CPT","1LT","2LT","CMSAF","CMSgt","SMSgt","MSgt","TSgt","SSgt","SrA","A1C","Amn","AB"],
+  "Taliban": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"],
+  "Taliban Special Forces": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"],
+  "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit","Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"]
 };
 
+// ------------------- Utilities -------------------
 function contrast(hex) {
-  hex = (hex || '').replace('#', '');
-  if (hex.length !== 6) return '#000';
-  const r = parseInt(hex.slice(0,2),16), g= parseInt(hex.slice(2,4),16), b= parseInt(hex.slice(4,6),16);
-  return ((r*299+g*587+b*114)/1000) >= 128 ? '#000' : '#fff';
+  hex = (hex||'').replace('#','');
+  if(hex.length !== 6) return '#000';
+  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+  return ((r*299 + g*587 + b*114) / 1000) >= 128 ? '#000' : '#fff';
 }
 function fileNameFromUrl(url) {
-  if(typeof url !== 'string') return '';
-  try { let p = new URL(url).pathname; return p.substring(p.lastIndexOf('/') + 1); }
-  catch { return url.split('/').pop() || ''; }
+  if(!url) return '';
+  try { const p = new URL(url).pathname; return p.substring(p.lastIndexOf('/')+1); } catch { return (url||'').split('/').pop() || ''; }
 }
 function toast(msg){
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1500);
+  setTimeout(()=>{ t.style.opacity = '0'; setTimeout(()=>t.remove(),300); }, 1500);
 }
-
-// apply CSS transform for pan/zoom and enforce clamp to world bounds
 function applyTransform(){
-  // clamp tx/ty so world box stays at least partly visible and cannot be dragged past bounds
-  const stageRect = stage.getBoundingClientRect();
-  const stageW = stageRect.width;
-  const stageH = stageRect.height;
-  // world size after scale
-  const scaledW = WORLD_WIDTH * scale;
-  const scaledH = WORLD_HEIGHT * scale;
-  // min tx so right world edge >= stage left; max tx so left world edge <= stage right
-  const minTx = Math.min(0, stageW - scaledW);
-  const maxTx = 0;
-  const minTy = Math.min(0, stageH - scaledH);
-  const maxTy = 0;
-  tx = Math.min(Math.max(tx, minTx - 50), maxTx + 50); // small 50px leeway
-  ty = Math.min(Math.max(ty, minTy - 50), maxTy + 50);
   viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
 }
-
-// convert client (screen) coordinates to world coordinates (untransformed)
 function clientToWorld(cx, cy){
-  const r=stage.getBoundingClientRect();
-  const sx=cx-r.left, sy=cy-r.top;
+  const r = stage.getBoundingClientRect();
+  const sx = cx - r.left, sy = cy - r.top;
   return { x: (sx - tx) / scale, y: (sy - ty) / scale };
 }
 function snapToGrid(v){ return Math.round(v / snap) * snap; }
 
-function linkListHTML(files) {
-  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+// Determine center of viewport in world coords (used when creating new items to spawn at camera center)
+function worldCenter() {
+  const rect = stage.getBoundingClientRect();
+  // center of stage in client coords:
+  const cx = rect.left + rect.width/2;
+  const cy = rect.top + rect.height/2;
+  return clientToWorld(cx, cy);
 }
 
-/* ---------- Related files dropdown population ---------- */
-/* Populate fRelatedSelect from DB nodes: suspects, insurgents, informants */
-async function fillRelatedSelect(selected = []) {
-  const sel = document.getElementById("fRelatedSelect");
-  sel.innerHTML = "";
-  const paths = ["suspects", "insurgents", "informants"];
-  for (let path of paths) {
+// ------------------- Related files selector (Firebase) -------------------
+async function fillRelatedSelect(selectedArray = []) {
+  const sel = document.getElementById('fRelatedSelect');
+  sel.innerHTML = '';
+  const groups = ['suspects','insurgents','informants'];
+  for (const path of groups) {
     try {
-      const snap = await db.ref(path).once('value');
-      if (snap.exists()) {
-        const group = document.createElement("optgroup");
-        group.label = path;
-        const val = snap.val();
-        // iterate stored files (assumes structure: id -> { url, name })
-        Object.keys(val || {}).forEach(k=>{
-          const file = val[k];
-          const opt = document.createElement("option");
-          opt.value = file.url;
-          opt.textContent = file.name || fileNameFromUrl(file.url);
-          if (selected && selected.some(s => s.url === opt.value)) opt.selected = true;
-          group.appendChild(opt);
-        });
-        sel.appendChild(group);
-      }
-    } catch (err) {
-      console.warn("Failed to load", path, err);
+      const snapshot = await db.ref(path).once('value');
+      const val = snapshot.val();
+      if (!val) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = path;
+      Object.values(val).forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.url || item;
+        opt.textContent = item.name || fileNameFromUrl(item.url || item);
+        if ((selectedArray||[]).some(s => s.url === opt.value)) opt.selected = true;
+        optgroup.appendChild(opt);
+      });
+      sel.appendChild(optgroup);
+    } catch (e) {
+      console.warn('Failed to load', path, e);
     }
   }
 }
 
-/* ---------- Edge drawing & anchor positioning (model-based) ---------- */
-/* anchorCenter returns anchor center in WORLD coordinates using model coords + anchor offsets */
+// ------------------- Edges & anchor positioning -------------------
+// Compute anchor center in WORLD coordinates using model-based math (avoids transform mismatch)
 function anchorCenter(cardId) {
-  const cardModel = cards.find(c => c.id === cardId);
+  const card = cards.find(c => c.id === cardId);
   const cardEl = document.getElementById(cardId);
-  if (!cardModel || !cardEl) return null;
+  if (!card || !cardEl) return null;
+
+  // Compute anchor offset within card using DOM offsets (robust) but base on card.x,card.y world coords
   const anchorEl = cardEl.querySelector('.anchor');
   if (!anchorEl) return null;
-  // offsetLeft/Top are relative to card element; use model card.x/y for world coords
-  const ax = cardModel.x + anchorEl.offsetLeft + anchorEl.offsetWidth / 2;
-  const ay = cardModel.y + anchorEl.offsetTop + anchorEl.offsetHeight / 2;
-  return { x: ax, y: ay };
+
+  // offsetLeft/Top are relative to cardEl (card is not transformed)
+  const offsetX = anchorEl.offsetLeft + (anchorEl.offsetWidth / 2);
+  const offsetY = anchorEl.offsetTop + (anchorEl.offsetHeight / 2);
+
+  // world coordinates = model card.x/y + offset (card.x/y are world coords)
+  const worldX = card.x + offsetX;
+  const worldY = card.y + offsetY;
+
+  return { x: worldX, y: worldY };
 }
 
 function updateEdges() {
-  // Clear existing
-  while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
+  // remove all children
+  while(wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
   edges.forEach(edge => {
     const aId = edge.a ? edge.a.card : (edge.from || null);
     const bId = edge.b ? edge.b.card : (edge.to || null);
@@ -360,20 +349,25 @@ function updateEdges() {
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    // coordinates in WORLD space (viewport is transformed with CSS scale/translate)
+    // NOTE: SVG is inside viewport which is transformed with the same translate/scale as cards,
+    // so coordinates should be in world space (untransformed).
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
     line.setAttribute("y2", posB.y);
-    line.setAttribute("stroke", "#ffffff"); // white lines as requested
-    line.setAttribute("stroke-width", "4");
+    line.setAttribute("stroke", "#ffffff"); // white lines
+    line.setAttribute("stroke-width", "3");
     line.setAttribute("stroke-linecap", "round");
     line.setAttribute("opacity", "0.95");
     wiresLayer.appendChild(line);
   });
 }
 
-/* ---------- Rendering cards & textboxes ---------- */
+// ------------------- Rendering cards & textboxes -------------------
+function linkListHTML(files) {
+  return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+}
+
 function makeCardView(card) {
   const existing = document.getElementById(card.id);
   if (existing) existing.remove();
@@ -384,14 +378,14 @@ function makeCardView(card) {
   c.style.top = card.y + 'px';
   c.style.setProperty('--branchGlow', card.data.branchColor || '#4caf50');
   c.style.setProperty('--selectedHighlightColor', card.data.branchColor || '#ffc107');
-  const d = card.data;
+  const d = card.data || {};
   const barText = contrast(d.branchColor || '#777');
   c.innerHTML = `
-    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor};box-shadow:0 0 6px 2px ${d.branchColor}cc;">
+    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" style="border-color:${d.branchColor || '#777'};box-shadow:0 0 6px 2px ${ (d.branchColor||'#777') }cc;">
     <div class="info">
-      <div class="name" style="color:${d.branchColor}">${d.name || 'Unnamed'}</div>
+      <div class="name" style="color:${d.branchColor || '#777'}">${d.name || 'Unnamed'}</div>
       <div class="rank">${d.rank || ''}</div>
-      <div class="bar" style="background:${d.branchColor};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
+      <div class="bar" style="background:${d.branchColor || '#777'};color:${barText}">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
       <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span>${d.status || 'Unknown'}</div>
       <div class="desc">${d.desc || ''}</div>
       <ul class="file-list" style="margin-top:8px;padding-left:18px;max-height:90px;overflow:auto;">
@@ -401,26 +395,29 @@ function makeCardView(card) {
     <div class="anchor" title="Drag to link"></div>
   `;
 
-  // Click to select — but allow clicking anchors/links to work
+  // Click to select - but allow clicks on anchors and links to work
   c.addEventListener('click', e => {
-    // If user clicked a link (or inside a link), do nothing — let the link open
-    if (e.target.closest('a')) return;
-    // If editing text inside, do not open editor
-    if (editingTextLabel) return;
+    // if click on anchor or a link or any interactive element, don't open editor
+    if (e.target.closest('.anchor') || e.target.closest('a') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea') || e.target.closest('.file-list')) {
+      return;
+    }
     e.stopPropagation();
-    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
-    selected = card.id; selectedType = 'card'; c.classList.add('selected');
+    if (editingTextLabel) return;
+    const prev = document.getElementById(selected);
+    if (prev) prev.classList.remove('selected');
+    selected = card.id; selectedType = 'card';
+    c.classList.add('selected');
     openEditor(card.id, 'card');
   });
 
-  // Dragging for cards (ignore pointerdown on anchor)
+  // dragging for card (ignore anchor and links)
   let dragging = false;
   let offset = {x:0,y:0};
   c.addEventListener('pointerdown', e => {
-    if(e.target.classList.contains('anchor')) return;
+    if (e.target.closest('.anchor') || e.target.closest('a') || e.target.closest('input') || e.target.closest('textarea')) return;
     dragging = true;
     c.classList.add('dragging');
-    c.setPointerCapture(e.pointerId);
+    try { c.setPointerCapture(e.pointerId); } catch {}
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - card.x;
     offset.y = wp.y - card.y;
@@ -430,35 +427,31 @@ function makeCardView(card) {
     const wp = clientToWorld(e.clientX, e.clientY);
     card.x = snapToGrid(wp.x - offset.x);
     card.y = snapToGrid(wp.y - offset.y);
-    // enforce card stay in world bounds
-    card.x = Math.max(0, Math.min(card.x, WORLD_WIDTH - 60)); // some margin
-    card.y = Math.max(0, Math.min(card.y, WORLD_HEIGHT - 60));
     c.style.left = card.x + 'px';
     c.style.top = card.y + 'px';
+    // when card moves, update edges immediately
     updateEdges();
   });
   c.addEventListener('pointerup', e => {
     if(!dragging) return;
     dragging = false;
     c.classList.remove('dragging');
-    try { c.releasePointerCapture(e.pointerId); } catch{}
+    try { c.releasePointerCapture(e.pointerId); } catch {}
     snapshot();
   });
   c.addEventListener('pointercancel', e => {
     dragging = false;
     c.classList.remove('dragging');
-    try { c.releasePointerCapture(e.pointerId); } catch{}
+    try { c.releasePointerCapture(e.pointerId); } catch {}
   });
 
   cardsLayer.appendChild(c);
   return c;
 }
 
-/* Textbox view */
 function makeTextBoxView(box) {
   const existing = document.getElementById(box.id);
   if (existing) existing.remove();
-
   const wrapper = document.createElement('div');
   wrapper.className = 'textbox-wrapper';
   wrapper.id = box.id;
@@ -473,19 +466,13 @@ function makeTextBoxView(box) {
   if (box.height) textarea.style.height = box.height + 'px';
   textarea.spellcheck = false;
 
-  // Prevent textarea clicks/focus from opening editor
-  textarea.addEventListener('pointerdown', e => {
-    e.stopPropagation(); // stops stage/card click handlers
-  });
+  // prevent pointerdown from selecting the stage
+  textarea.addEventListener('pointerdown', e => e.stopPropagation());
   textarea.addEventListener('focus', e => { editingTextLabel = true; });
   textarea.addEventListener('blur', e => { editingTextLabel = false; snapshot(); });
 
-  // Keep model content in sync
-  textarea.addEventListener('input', e => {
-    box.content = textarea.value;
-  });
+  textarea.addEventListener('input', e => box.content = textarea.value);
 
-  // Dragging wrapper (only when pointerdown outside of the textarea's scroll/resize grab)
   let dragging = false;
   let offset = {x:0,y:0};
   wrapper.addEventListener('pointerdown', e => {
@@ -493,7 +480,7 @@ function makeTextBoxView(box) {
     e.stopPropagation();
     dragging = true;
     wrapper.classList.add('dragging');
-    wrapper.setPointerCapture(e.pointerId);
+    try { wrapper.setPointerCapture(e.pointerId); } catch {}
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - box.x;
     offset.y = wp.y - box.y;
@@ -521,13 +508,11 @@ function makeTextBoxView(box) {
     try { wrapper.releasePointerCapture(e.pointerId); } catch {}
   });
 
-  // Observe size changes (native resize) to keep model in sync
   const ro = new ResizeObserver(entries => {
-    for(const ent of entries) {
+    for (const ent of entries) {
       const w = Math.round(ent.contentRect.width);
       const h = Math.round(ent.contentRect.height);
-      box.width = w;
-      box.height = h;
+      box.width = w; box.height = h;
       wrapper.style.width = w + 'px';
       snapshot();
       updateEdges();
@@ -535,11 +520,12 @@ function makeTextBoxView(box) {
   });
   ro.observe(textarea);
 
-  // Click wrapper to select and open editor
   wrapper.addEventListener('click', e => {
     e.stopPropagation();
-    if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
-    selected = box.id; selectedType = 'textbox'; wrapper.classList.add('selected');
+    const prev = document.getElementById(selected);
+    if (prev) prev.classList.remove('selected');
+    selected = box.id; selectedType = 'textbox';
+    wrapper.classList.add('selected');
     openEditor(box.id, 'textbox');
   });
 
@@ -548,26 +534,23 @@ function makeTextBoxView(box) {
   return wrapper;
 }
 
-/* ---------- General render ---------- */
 function render() {
-  // Clear layers then recreate
   cardsLayer.innerHTML = '';
   cards.forEach(makeCardView);
   textBoxes.forEach(makeTextBoxView);
   updateEdges();
 }
 
-/* ---------- Snapshot / undo / redo ---------- */
+// ------------------- Snapshot / undo / redo -------------------
 function snapshot() {
   try {
     const state = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(state);
-    if (undoStack.length > 200) undoStack.shift();
+    if (undoStack.length > 300) undoStack.shift();
     redoStack = [];
-  } catch (e) {
-    console.warn("Snapshot failed", e);
-  }
+  } catch(e) { console.warn('snapshot failed', e); }
 }
+
 function loadState(state) {
   cards.splice(0, cards.length, ...(state.cards || []));
   edges.splice(0, edges.length, ...(state.edges || []));
@@ -578,6 +561,7 @@ function loadState(state) {
   applyTransform();
   render();
 }
+
 function undo() {
   if (undoStack.length === 0) { toast("Nothing to undo"); return; }
   try {
@@ -588,6 +572,7 @@ function undo() {
     toast("Undo");
   } catch (e) { console.error(e); }
 }
+
 function redo() {
   if (redoStack.length === 0) { toast("Nothing to redo"); return; }
   try {
@@ -599,87 +584,85 @@ function redo() {
   } catch (e) { console.error(e); }
 }
 
-/* ---------- Selection / Editor ---------- */
+// ------------------- Selection / Editor -------------------
 function deselect() {
   if (selected) {
-    let el = document.getElementById(selected);
-    if (el) el.classList.remove("selected");
+    const el = document.getElementById(selected);
+    if (el) el.classList.remove('selected');
     selected = null; selectedType = null;
   }
   closeEditor();
 }
-function closeEditor() { document.getElementById("editor").style.display = "none"; }
+function closeEditor() { document.getElementById('editor').style.display = 'none'; }
 
 async function openEditor(id, type) {
-  let ed = document.getElementById("editor");
-  ed.style.display = "block";
+  const ed = document.getElementById('editor');
+  ed.style.display = 'block';
 
-  // Reset fields
-  document.getElementById("fImage").value = "";
-  document.getElementById("fName").value = "";
-  fillBranchSelect("None");
-  fillRankSelect("None", "None");
-  document.getElementById("fSubbranch").value = "";
-  document.getElementById("fStatus").value = "Unknown";
-  document.getElementById("fDesc").value = "";
-  document.getElementById("otherList").innerHTML = "(none)";
-  document.getElementById("fOtherUrl").value = "";
-  document.getElementById("fOtherName").value = "";
+  // reset fields
+  document.getElementById('fImage').value = '';
+  document.getElementById('fName').value = '';
+  fillBranchSelect('None');
+  fillRankSelect('None', 'None');
+  document.getElementById('fSubbranch').value = '';
+  document.getElementById('fStatus').value = 'Unknown';
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fRelatedUrl').value = '';
+  document.getElementById('fRelatedName').value = '';
+  document.getElementById('fOtherUrl').value = '';
+  document.getElementById('fOtherName').value = '';
 
-  // Get the card if type=card
-  const card = (type === "card") ? cards.find(c => c.id === id) : null;
+  // get card if any
+  const card = (type === 'card') ? cards.find(c => c.id === id) : null;
 
-  // Populate related files select from Firebase (pass already-selected relatedFiles)
-  await fillRelatedSelect(card ? card.data.relatedFiles : []);
+  // fill related select from firebase (selected from card.relatedFiles if present)
+  await fillRelatedSelect(card ? (card.data.relatedFiles || []) : []);
 
-  selected = id;
-  selectedType = type;
+  // other lists
+  document.getElementById('otherList').innerHTML = '(none)';
+  document.getElementById('relatedList').innerHTML = '(none)';
 
-  if (type === "card" && card) {
-    // Show full editor
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
-    document.getElementById("fImage").value = card.data.image || "";
-    document.getElementById("fName").value = card.data.name || "";
+  selected = id; selectedType = type;
+
+  if (type === 'card' && card) {
+    // show all editor elements
+    document.querySelectorAll('#editor *').forEach(el => el.style.display = '');
+    document.getElementById('fImage').value = card.data.image || '';
+    document.getElementById('fName').value = card.data.name || '';
     fillBranchSelect(card.data.branch);
     fillRankSelect(card.data.branch, card.data.rank);
-    document.getElementById("fSubbranch").value = card.data.subbranch || "";
-    document.getElementById("fStatus").value = card.data.status || "Unknown";
-    document.getElementById("fDesc").value = card.data.desc || "";
-    // populate other files list
-    renderFileList("otherList", card.data.otherFiles);
-  } else if (type === "textbox") {
-    // Hide everything except header + description label + textarea
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
-    document.querySelector("#editor header").style.display = "block";
-
-    const descLabel = Array.from(document.querySelectorAll("#editor label"))
-      .find(l => l.textContent.includes("Short Description"));
-    if (descLabel) descLabel.style.display = "block";
-
-    document.getElementById("fDesc").style.display = "block";
-
+    document.getElementById('fSubbranch').value = card.data.subbranch || '';
+    document.getElementById('fStatus').value = card.data.status || 'Unknown';
+    document.getElementById('fDesc').value = card.data.desc || '';
+    renderFileList('relatedList', card.data.relatedFiles);
+    renderFileList('otherList', card.data.otherFiles);
+  } else if (type === 'textbox') {
+    // hide everything except header + description label + textarea
+    document.querySelectorAll('#editor *').forEach(el => el.style.display = 'none');
+    document.querySelector('#editor header').style.display = 'block';
+    const descLabel = Array.from(document.querySelectorAll('#editor label')).find(l => l.textContent.includes('Short Description'));
+    if (descLabel) descLabel.style.display = 'block';
+    document.getElementById('fDesc').style.display = 'block';
     const box = textBoxes.find(t => t.id === id);
-    if (box) document.getElementById("fDesc").value = box.content || "";
+    if (box) document.getElementById('fDesc').value = box.content || '';
   }
 }
 
 function fillBranchSelect(selectedBranch) {
-  const sel = document.getElementById("fBranch");
-  if(!sel) return;
-  sel.innerHTML = "";
+  const sel = document.getElementById('fBranch');
+  sel.innerHTML = '';
   Object.keys(branchColors).forEach(b => {
-    const opt = document.createElement("option");
+    const opt = document.createElement('option');
     opt.value = b; opt.textContent = b;
     if (b === selectedBranch) opt.selected = true;
     sel.appendChild(opt);
   });
 }
 function fillRankSelect(branch, selectedRank) {
-  const sel = document.getElementById("fRank");
-  if(!sel) return;
-  sel.innerHTML = "";
+  const sel = document.getElementById('fRank');
+  sel.innerHTML = '';
   (rankLists[branch] || ['None']).forEach(r => {
-    const opt = document.createElement("option");
+    const opt = document.createElement('option');
     opt.value = r; opt.textContent = r;
     if (r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
@@ -687,50 +670,104 @@ function fillRankSelect(branch, selectedRank) {
 }
 function renderFileList(containerId, files) {
   const cont = document.getElementById(containerId);
-  if(!cont) return;
-  cont.innerHTML = "";
-  if (!files || files.length === 0) {
-    cont.textContent = "(none)";
-    return;
-  }
+  cont.innerHTML = '';
+  if (!files || files.length === 0) { cont.textContent = '(none)'; return; }
   const ul = document.createElement('ul');
-  ul.style.margin = '6px 0 0 0';
-  ul.style.paddingLeft = '18px';
-  files.forEach(f => {
+  ul.style.margin = '6px 0 0 0'; ul.style.paddingLeft = '18px';
+  (files||[]).forEach(f=>{
     const li = document.createElement('li');
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = f.url || f;
     a.textContent = f.name || fileNameFromUrl(f.url || f);
-    a.target = "_blank"; a.rel = "noopener";
+    a.target = '_blank'; a.rel = 'noopener';
     li.appendChild(a);
     ul.appendChild(li);
   });
   cont.appendChild(ul);
 }
 
-/* ---------- Editor buttons/handlers ---------- */
-document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return toast("No card selected");
-  const url = document.getElementById("fOtherUrl").value.trim();
-  const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if(!url) return alert("Please enter a URL");
+// ------------------- Editor actions: add related/external, save -------------------
+document.getElementById('btnAddRelated').onclick = ()=>{
+  if(!selected || selectedType !== 'card') { alert('No card selected'); return; }
+  const url = document.getElementById('fRelatedUrl').value.trim();
+  const name = document.getElementById('fRelatedName').value.trim() || fileNameFromUrl(url);
+  if(!url) { alert('Please enter a URL'); return; }
+  const card = cards.find(c=>c.id === selected);
+  if(!card) return;
+  card.data.relatedFiles = card.data.relatedFiles || [];
+  if(!card.data.relatedFiles.some(f=>f.url === url)){
+    card.data.relatedFiles.push({url, name});
+    renderFileList('relatedList', card.data.relatedFiles);
+    document.getElementById('fRelatedUrl').value = ''; document.getElementById('fRelatedName').value = '';
+    snapshot();
+  }
+};
+
+document.getElementById('btnAddOther').onclick = ()=>{
+  if(!selected || selectedType !== 'card') { alert('No card selected'); return; }
+  const url = document.getElementById('fOtherUrl').value.trim();
+  const name = document.getElementById('fOtherName').value.trim() || fileNameFromUrl(url);
+  if(!url) { alert('Please enter a URL'); return; }
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
   card.data.otherFiles.push({url, name});
-  renderFileList("otherList", card.data.otherFiles);
-  document.getElementById("fOtherUrl").value = "";
-  document.getElementById("fOtherName").value = "";
+  renderFileList('otherList', card.data.otherFiles);
+  document.getElementById('fOtherUrl').value = ''; document.getElementById('fOtherName').value = '';
   snapshot();
 };
 
-/* ---------- Create new elements ---------- */
+// Save and Cancel
+document.getElementById('btnSave').onclick = ()=>{
+  if(!selected) return;
+  if(selectedType === 'card'){
+    const card = cards.find(c=>c.id === selected);
+    if(!card) return;
+
+    // gather related files from the multi-select
+    const sel = document.getElementById('fRelatedSelect');
+    const selectedOpts = Array.from(sel.selectedOptions || []).map(o => ({ url: o.value, name: o.textContent }));
+    // external-only (existing card.data.relatedFiles that are not DB-selected)
+    const externalOnly = (card.data.relatedFiles || []).filter(f => !selectedOpts.some(s => s.url === f.url));
+    card.data.relatedFiles = [...selectedOpts, ...externalOnly];
+
+    // other fields
+    card.data.image = document.getElementById('fImage').value.trim();
+    card.data.name = document.getElementById('fName').value.trim();
+    card.data.branch = document.getElementById('fBranch').value;
+    card.data.subbranch = document.getElementById('fSubbranch').value.trim();
+    card.data.rank = document.getElementById('fRank').value;
+    card.data.status = document.getElementById('fStatus').value;
+    card.data.desc = document.getElementById('fDesc').value.trim();
+    card.data.branchColor = branchColors[card.data.branch] || '#777';
+
+    // Re-render card and edges
+    const oldEl = document.getElementById(card.id); if (oldEl) oldEl.remove();
+    makeCardView(card);
+    updateEdges();
+  } else if (selectedType === 'textbox') {
+    const box = textBoxes.find(t => t.id === selected);
+    if(!box) return;
+    box.content = document.getElementById('fDesc').value.trim();
+    const oldEl = document.getElementById(box.id);
+    if(oldEl) {
+      const ta = oldEl.querySelector('textarea');
+      if(ta) ta.value = box.content;
+    }
+  }
+  closeEditor();
+  snapshot();
+  render();
+};
+document.getElementById('btnCancel').onclick = closeEditor;
+
+// ------------------- Create new elements -------------------
 function createDefaultCard(pos){
   const id = "c" + Math.random().toString(36).slice(2,9);
   const newCard = {
     id,
-    x: snapToGrid(Math.max(0, Math.min(pos.x - 180, WORLD_WIDTH - 360))),
-    y: snapToGrid(Math.max(0, Math.min(pos.y - 45, WORLD_HEIGHT - 75))),
+    x: snapToGrid(pos.x - 180),
+    y: snapToGrid(pos.y - 90),
     data: {
       image: "https://i.ibb.co/zhKnjbh1/unknownperson.png",
       name: "New Profile",
@@ -751,53 +788,44 @@ function createDefaultTextbox(pos){
   return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300, height: null };
 }
 
-/* ---------- Toolbar bindings ---------- */
-document.getElementById("addProfileBtn").onclick = ()=>{
-  // spawn at current viewport center
-  const stageRect = stage.getBoundingClientRect();
-  const centerClientX = stageRect.left + stageRect.width / 2;
-  const centerClientY = stageRect.top + stageRect.height / 2;
-  const pos = clientToWorld(centerClientX, centerClientY);
-  const newCard = createDefaultCard(pos);
+// ------------------- Toolbar bindings -------------------
+document.getElementById('addProfileBtn').onclick = ()=>{
+  const center = worldCenter();
+  const newCard = createDefaultCard(center);
   cards.push(newCard);
   selected = newCard.id; selectedType = 'card';
   makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 };
-document.getElementById("addTextBtn").onclick = ()=>{
-  const stageRect = stage.getBoundingClientRect();
-  const centerClientX = stageRect.left + stageRect.width / 2;
-  const centerClientY = stageRect.top + stageRect.height / 2;
-  const pos = clientToWorld(centerClientX, centerClientY);
-  const newBox = createDefaultTextbox(pos);
+
+document.getElementById('addTextBtn').onclick = ()=>{
+  const center = worldCenter();
+  const newBox = createDefaultTextbox(center);
   textBoxes.push(newBox);
   selected = newBox.id; selectedType = 'textbox';
   makeTextBoxView(newBox); snapshot(); render(); openEditor(newBox.id, 'textbox');
 };
-document.getElementById("deleteSelectedBtn").onclick = async function(){
+
+document.getElementById('deleteSelectedBtn').onclick = async function(){
   if(!selected) { toast("Select a card or textbox first"); return; }
   const confirmed = await customConfirm("Delete selected item?");
   if(!confirmed) return;
-
-  if(selectedType === "card"){
+  if(selectedType === 'card'){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
-    edges = edges.filter(e => (e.a && e.a.card !== selected) && (e.b && e.b.card !== selected));
-  } else if(selectedType === "textbox"){
+    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
+  } else if (selectedType === 'textbox'){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
   }
-  const el = document.getElementById(selected);
-  if(el) el.remove();
+  const el = document.getElementById(selected); if(el) el.remove();
   selected = null; selectedType = null;
   closeEditor(); render(); snapshot();
 };
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('redoBtn').onclick = redo;
 
-document.getElementById("undoBtn").onclick = undo;
-document.getElementById("redoBtn").onclick = redo;
-
-/* ---------- Stage interactions ---------- */
-// Double-click stage to add a card (guard when editing text)
-stage.addEventListener("dblclick", e=>{
+// ------------------- Stage interactions -------------------
+stage.addEventListener('dblclick', e=>{
   if (editingTextLabel) return;
-  if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
+  if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
   const pos = clientToWorld(e.clientX, e.clientY);
   const newCard = createDefaultCard(pos);
   cards.push(newCard);
@@ -805,8 +833,8 @@ stage.addEventListener("dblclick", e=>{
   makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 });
 
-// Search filtering + focus single-match
-document.getElementById("searchBox").oninput = function(){
+// search
+document.getElementById('searchBox').oninput = function(){
   const query = this.value.toLowerCase();
   let matches = [];
   cards.forEach(card=>{
@@ -814,34 +842,31 @@ document.getElementById("searchBox").oninput = function(){
     if(!el) return;
     const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
     const shown = !query || text.includes(query);
-    el.style.display = shown ? "flex" : "none";
+    el.style.display = shown ? 'flex' : 'none';
     if (shown && query && text.includes(query)) matches.push(card);
   });
   textBoxes.forEach(box=>{
     const el = document.getElementById(box.id);
     if(!el) return;
-    const text = (box.content || "").toLowerCase();
-    el.style.display = !query || text.includes(query) ? "block" : "none";
+    const text = (box.content || '').toLowerCase();
+    el.style.display = !query || text.includes(query) ? 'block' : 'none';
   });
-
   if (matches.length === 1) focusCard(matches[0]);
 };
-
 function focusCard(card){
   const el = document.getElementById(card.id);
   if(!el) return;
   const rect = stage.getBoundingClientRect();
-  const cardCenterX = card.x + 180; // half of 360 width
+  const cardCenterX = card.x + 180;
   const cardCenterY = card.y + 90;
-  tx = rect.width / 2 - cardCenterX * scale;
-  ty = rect.height / 2 - cardCenterY * scale;
-  applyTransform();
-  updateEdges();
+  tx = rect.width/2 - cardCenterX * scale;
+  ty = rect.height/2 - cardCenterY * scale;
+  applyTransform(); updateEdges();
   el.classList.remove('flash-highlight'); void el.offsetWidth; el.classList.add('flash-highlight');
 }
 
-/* ---------- Zoom ---------- */
-stage.addEventListener('wheel', e => {
+// ------------------- Zoom & Pan -------------------
+stage.addEventListener('wheel', e=>{
   e.preventDefault();
   const zoomFactor = 1.1;
   const mousePos = clientToWorld(e.clientX, e.clientY);
@@ -849,64 +874,57 @@ stage.addEventListener('wheel', e => {
   scale = Math.min(Math.max(scale, 0.25), 4);
   tx = e.clientX - mousePos.x * scale;
   ty = e.clientY - mousePos.y * scale;
-  applyTransform();
-  updateEdges();
-}, { passive: false });
+  applyTransform(); updateEdges();
+}, { passive:false });
 
 // Panning
-let isPanning = false;
-let panStart = { x: 0, y: 0 };
-let panOrigin = { tx: 0, ty: 0 };
-stage.addEventListener('pointerdown', e => {
+let isPanning = false, panStart = {x:0,y:0}, panOrigin = {tx:0,ty:0};
+stage.addEventListener('pointerdown', e=>{
   if (e.target.closest('.card') || e.target.classList.contains('anchor') || e.target.closest('#toolbar') || e.target.classList.contains('textbox')) return;
   isPanning = true;
-  panStart.x = e.clientX;
-  panStart.y = e.clientY;
-  panOrigin.tx = tx;
-  panOrigin.ty = ty;
+  panStart.x = e.clientX; panStart.y = e.clientY;
+  panOrigin.tx = tx; panOrigin.ty = ty;
   stage.style.cursor = 'grabbing';
-  stage.setPointerCapture(e.pointerId);
+  try { stage.setPointerCapture(e.pointerId); } catch {}
 });
-stage.addEventListener('pointermove', e => {
+stage.addEventListener('pointermove', e=>{
   if (!isPanning) return;
   const dx = e.clientX - panStart.x;
   const dy = e.clientY - panStart.y;
   tx = panOrigin.tx + dx;
   ty = panOrigin.ty + dy;
-  applyTransform();
-  updateEdges();
+  applyTransform(); updateEdges();
 });
-stage.addEventListener('pointerup', e => {
+stage.addEventListener('pointerup', e=>{
   if (!isPanning) return;
   isPanning = false;
   stage.style.cursor = 'grab';
-  try { stage.releasePointerCapture(e.pointerId); } catch{}
+  try { stage.releasePointerCapture(e.pointerId); } catch {}
   snapshot();
 });
-stage.addEventListener('pointercancel', e => {
+stage.addEventListener('pointercancel', e=>{
   if (!isPanning) return;
   isPanning = false;
   stage.style.cursor = 'grab';
-  try { stage.releasePointerCapture(e.pointerId); } catch{}
+  try { stage.releasePointerCapture(e.pointerId); } catch {}
   snapshot();
 });
 
-/* ---------- Anchor linking (create edges) ---------- */
+// ------------------- Anchor linking -------------------
 let anchorDrag = { active:false, startCardId:null, tmpLine:null };
-stage.addEventListener('pointerdown', e => {
+
+stage.addEventListener('pointerdown', e=>{
   if (e.target.classList.contains('anchor')) {
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
     anchorDrag.active = true;
     anchorDrag.startCardId = cardEl.id;
-
     const svgNS = "http://www.w3.org/2000/svg";
     anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
-    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff'); // white
     anchorDrag.tmpLine.setAttribute('stroke-width', '3');
     anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(anchorDrag.tmpLine);
-
     const startPos = anchorCenter(anchorDrag.startCardId);
     if (startPos) {
       anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -917,7 +935,8 @@ stage.addEventListener('pointerdown', e => {
     try { e.target.setPointerCapture(e.pointerId); } catch {}
   }
 });
-stage.addEventListener('pointermove', e => {
+
+stage.addEventListener('pointermove', e=>{
   if (!anchorDrag.active) return;
   const pos = clientToWorld(e.clientX, e.clientY);
   const startPos = anchorCenter(anchorDrag.startCardId);
@@ -928,99 +947,114 @@ stage.addEventListener('pointermove', e => {
     anchorDrag.tmpLine.setAttribute('y2', pos.y);
   }
 });
-stage.addEventListener('pointerup', e => {
+
+stage.addEventListener('pointerup', e=>{
   if (!anchorDrag.active) return;
   anchorDrag.active = false;
-
   let targetCard = null;
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  if(el) {
+  if (el) {
     const cardEl = el.closest('.card');
-    if(cardEl) targetCard = cardEl.id;
+    if (cardEl) targetCard = cardEl.id;
   }
-
   if (!targetCard || targetCard === anchorDrag.startCardId) {
     if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
     try { e.target.releasePointerCapture(e.pointerId); } catch {}
     return;
   }
 
-  // Prevent duplicate edges
-  if (!edges.some(edge =>
-    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
-    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
-  )) {
+  // prevent duplicate edges
+  if (!edges.some(edge => (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) || (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId))) {
     const newEdge = { id: "e" + Math.random().toString(36).slice(2,9), a: { card: anchorDrag.startCardId }, b: { card: targetCard } };
     edges.push(newEdge);
     updateEdges();
     snapshot();
     render();
   }
-
   if (anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
 
-/* ---------- Deselect on stage click ---------- */
-stage.addEventListener("click", e=>{
-  if(e.target === stage || e.target === viewport){
-    if(selected){
+// ------------------- Stage click deselect -------------------
+stage.addEventListener('click', e=>{
+  if (e.target === stage || e.target === viewport) {
+    if (selected) {
       const el = document.getElementById(selected);
-      if(el) el.classList.remove("selected");
+      if (el) el.classList.remove('selected');
       selected = null; selectedType = null; closeEditor();
     }
   }
 });
 
-/* ---------- Firebase: save/load/delete & web list ---------- */
+// ------------------- Firebase: save / load / list -------------------
 const webNameInput = document.getElementById('webNameInput');
 const webListDropdown = document.getElementById('webListDropdown');
 let currentWebListener = null;
 
+async function refreshWebList() {
+  try {
+    const snapshot = await db.ref('connectionWebs').once('value');
+    const data = snapshot.val() || {};
+    webListDropdown.innerHTML = '';
+    Object.keys(data).sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      webListDropdown.appendChild(opt);
+    });
+    const last = localStorage.getItem('lastWeb');
+    if (last && data[last]) {
+      webListDropdown.value = last; webNameInput.value = last; subscribeToWeb(last);
+    }
+  } catch (e) { console.error('Failed to load Connection Webs list:', e); }
+}
+
 async function subscribeToWeb(name) {
   if (currentWebListener) {
-    if(webListDropdown.value) {
+    if (webListDropdown.value) {
       db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
     }
     currentWebListener = null;
   }
-  if(!name) return;
+  if (!name) return;
   const ref = db.ref(`connectionWebs/${name}`);
   currentWebListener = ref.on('value', snapshot => {
     const data = snapshot.val();
     if (!data) {
       toast(`No data found for "${name}"`);
-      cards = []; edges = []; textBoxes = [];
-      tx = 0; ty = 0; scale = 1;
-      applyTransform();
+      cards = []; edges = []; textBoxes = []; tx = 0; ty = 0; scale = 1;
       render();
       return;
     }
-    // Restore saved state
-    cards.splice(0, cards.length, ...(data.cards || []));
-    edges.splice(0, edges.length, ...(data.edges || []));
-    textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
-    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
-    applyTransform();
-    render();
-    toast(`Synced with "${name}"`);
+    // load full web state (cards, edges, textBoxes, tx, ty, scale)
+    try {
+      cards.splice(0, cards.length, ...(data.cards || []));
+      edges.splice(0, edges.length, ...(data.edges || []));
+      textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
+      tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
+      applyTransform();
+      render();
+      toast(`Synced with "${name}"`);
+    } catch (e) {
+      console.error('Failed to restore web state', e);
+      alert('Failed to restore saved web state: ' + e.message);
+    }
   }, error => { alert("Realtime sync failed: " + error.message); });
 }
 
-webListDropdown.addEventListener("change", (e) => {
+webListDropdown.addEventListener('change', e=>{
   const name = e.target.value;
   if (!name) return;
-  localStorage.setItem("lastWeb", name);
+  localStorage.setItem('lastWeb', name);
   webNameInput.value = name;
   subscribeToWeb(name);
 });
-webNameInput.addEventListener("change", (e) => {
+webNameInput.addEventListener('change', e=>{
   const name = e.target.value.trim();
   if (!name) return;
-  localStorage.setItem("lastWeb", name);
+  localStorage.setItem('lastWeb', name);
   subscribeToWeb(name);
   if(!Array.from(webListDropdown.options).some(opt => opt.value === name)) {
-    const opt = document.createElement("option");
+    const opt = document.createElement('option');
     opt.value = name; opt.textContent = name;
     webListDropdown.appendChild(opt);
     webListDropdown.value = name;
@@ -1032,14 +1066,19 @@ async function saveCurrentWeb() {
   if (!name) { alert("Enter a Connection Web name"); return; }
   // Deep-clone to strip any DOM references
   const data = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() }));
-  try { await db.ref(`connectionWebs/${name}`).set(data); toast("Connection Web saved!"); await refreshWebList(); }
-  catch (e) { alert("Save failed: " + e.message); }
+  try {
+    await db.ref(`connectionWebs/${name}`).set(data);
+    toast("Connection Web saved!");
+    await refreshWebList();
+  } catch (e) {
+    alert("Save failed: " + e.message);
+  }
 }
 async function deleteCurrentWeb() {
   const name = webListDropdown.value;
   if (!name) { alert("Select a Connection Web to delete"); return; }
-  const confirmed = await customConfirm(`Delete "${name}"?`);
-  if (!confirmed) { toast("Deletion cancelled"); return; }
+  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
+  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
   try {
     if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
     await db.ref(`connectionWebs/${name}`).remove();
@@ -1047,116 +1086,36 @@ async function deleteCurrentWeb() {
     await refreshWebList();
   } catch (e) { alert("Delete failed: " + e.message); }
 }
-async function refreshWebList() {
-  try {
-    const snapshot = await db.ref('connectionWebs').once('value');
-    const data = snapshot.val() || {};
-    webListDropdown.innerHTML = "";
-    Object.keys(data).sort().forEach(name => {
-      const opt = document.createElement("option");
-      opt.value = name; opt.textContent = name;
-      webListDropdown.appendChild(opt);
-    });
-    let last = localStorage.getItem("lastWeb");
-    if (last && data[last]) {
-      webListDropdown.value = last;
-      webNameInput.value = last;
-      subscribeToWeb(last);
-    }
-  } catch (e) { console.error("Failed to load Connection Webs list:", e); }
-}
-document.getElementById("saveWebBtn").onclick = saveCurrentWeb;
-document.getElementById("loadWebBtn").onclick = () => {
+
+document.getElementById('saveWebBtn').onclick = saveCurrentWeb;
+document.getElementById('loadWebBtn').onclick = ()=>{
   const name = webListDropdown.value || webNameInput.value.trim();
-  if(!name) { alert("Pick or type a web name to load"); return; }
+  if (!name) { alert('Pick or type a web name to load'); return; }
   subscribeToWeb(name);
 };
-document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
+document.getElementById('deleteWebBtn').onclick = deleteCurrentWeb;
 
-/* ---------- Misc ---------- */
-// Deselect on background / stage click (extra)
-document.addEventListener("click", (e) => {
-  if (e.target.closest('#toolbar') || e.target.closest('#editor')) return;
-}, false);
+// ------------------- Misc helpers -------------------
+function customConfirm(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal'); const msgEl = document.getElementById('confirmMessage');
+    const yesBtn = document.getElementById('confirmYesBtn'); const noBtn = document.getElementById('confirmNoBtn');
+    msgEl.textContent = message; modal.style.display = 'flex';
+    const cleanup = ()=>{ modal.style.display='none'; yesBtn.onclick=null; noBtn.onclick=null; };
+    yesBtn.onclick = ()=>{ cleanup(); resolve(true); };
+    noBtn.onclick = ()=>{ cleanup(); resolve(false); };
+  });
+}
 
-// Initialize
-document.addEventListener("DOMContentLoaded", async ()=>{
-  // ensure world size matches constants
-  world.style.width = WORLD_WIDTH + 'px';
-  world.style.height = WORLD_HEIGHT + 'px';
-  // load web list and initial render
+// ------------------- Init -------------------
+document.addEventListener('DOMContentLoaded', async ()=>{
   await refreshWebList();
   render();
   snapshot();
 });
 
-/* Custom confirm modal */
-function customConfirm(message) {
-  return new Promise((resolve) => {
-    const modal = document.getElementById("confirmModal");
-    const msgEl = document.getElementById("confirmMessage");
-    const yesBtn = document.getElementById("confirmYesBtn");
-    const noBtn = document.getElementById("confirmNoBtn");
-
-    msgEl.textContent = message;
-    modal.style.display = "flex";
-
-    const cleanup = () => {
-      modal.style.display = "none";
-      yesBtn.onclick = null;
-      noBtn.onclick = null;
-    };
-
-    yesBtn.onclick = () => { cleanup(); resolve(true); };
-    noBtn.onclick = () => { cleanup(); resolve(false); };
-  });
-}
-
-// Save button: copy selected related files from dropdown into card data
-document.getElementById("btnSave").onclick = async ()=>{
-  if(!selected) return;
-  if(selectedType === 'card'){
-    const card = cards.find(c=>c.id === selected);
-    if(!card) return;
-    card.data.image = document.getElementById("fImage").value.trim();
-    card.data.name = document.getElementById("fName").value.trim();
-    card.data.branch = document.getElementById("fBranch").value;
-    card.data.subbranch = document.getElementById("fSubbranch").value.trim();
-    card.data.rank = document.getElementById("fRank").value;
-    card.data.status = document.getElementById("fStatus").value;
-    card.data.desc = document.getElementById("fDesc").value.trim();
-    card.data.branchColor = branchColors[card.data.branch] || "#777";
-
-    // related files from select
-    const sel = document.getElementById("fRelatedSelect");
-    if(sel) {
-      card.data.relatedFiles = Array.from(sel.selectedOptions).map(opt => ({ url: opt.value, name: opt.textContent }));
-    }
-
-    // update other files already in editor
-    // (otherList already updated by btnAddOther)
-    // re-render card
-    const oldEl = document.getElementById(card.id);
-    if(oldEl) oldEl.remove();
-    makeCardView(card);
-    updateEdges();
-  } else if(selectedType === 'textbox'){
-    const box = textBoxes.find(t => t.id === selected);
-    if(!box) return;
-    box.content = document.getElementById("fDesc").value.trim();
-    const oldEl = document.getElementById(box.id);
-    if(oldEl){
-      const ta = oldEl.querySelector('textarea');
-      if(ta) ta.value = box.content;
-    }
-  }
-  closeEditor();
-  snapshot();
-  render();
-};
-
-// Keyboard shortcuts: Ctrl+Z / Ctrl+Y
-document.addEventListener('keydown', (e) => {
+// keyboard shortcuts for undo/redo
+document.addEventListener('keydown', e=>{
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
 });
