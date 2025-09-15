@@ -41,17 +41,20 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   transition: box-shadow 0.15s;
 }
 
-.card {
-  width: 360px;
-  background: #222;
-  color: #e0e0e0;
-  border-radius: 10px;
-  padding: 15px 18px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  overflow: visible; /* ✅ changed from hidden → visible so anchors aren’t clipped */
+.card { 
+  width:360px;
+  background:#222;
+  color:#e0e0e0;
+  border-radius:10px;
+  padding:15px 18px;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  overflow:visible;   /* ✅ lets the anchor render above */
+  position: relative; /* ✅ ensures .anchor positions relative to card */
 }
+
+
 
 .textbox-wrapper {
   background: transparent;
@@ -145,17 +148,14 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #ffffff;        /* white for max contrast */
-  border: 2px solid #000000;  /* black border */
-  top: 0;                     /* anchor starts at card’s top edge */
+  background: #ffffff;
+  border: 2px solid #000000;
+  top: 0;
   left: 50%;
-  transform: translate(-50%, -150%); /* float above the card */
-  z-index: 9999;              /* ensure it’s always visible */
+  transform: translate(-50%, -150%);
+  z-index: 9999;
   cursor: crosshair;
 }
-
-
-
 
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
