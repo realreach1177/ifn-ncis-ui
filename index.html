@@ -752,37 +752,6 @@ async function openEditor(id, type) {
   }
 }
 
-    // Show everything
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
-
-    const card = cards.find(c => c.id === id);
-    if (!card) return;
-    document.getElementById("fImage").value = card.data.image || "";
-    document.getElementById("fName").value = card.data.name || "";
-    fillBranchSelect(card.data.branch);
-    fillRankSelect(card.data.branch, card.data.rank);
-    document.getElementById("fSubbranch").value = card.data.subbranch || "";
-    document.getElementById("fStatus").value = card.data.status || "Unknown";
-    document.getElementById("fDesc").value = card.data.desc || "";
-    renderFileList("relatedList", card.data.relatedFiles);
-    renderFileList("otherList", card.data.otherFiles);
-  } 
-  else if (type === "textbox") {
-    // Hide everything except header + description label + textarea
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
-    document.querySelector("#editor header").style.display = "block";
-
-    const descLabel = Array.from(document.querySelectorAll("#editor label"))
-      .find(l => l.textContent.includes("Short Description"));
-    if (descLabel) descLabel.style.display = "block";
-
-    document.getElementById("fDesc").style.display = "block";
-
-    const box = textBoxes.find(t => t.id === id);
-    if (box) document.getElementById("fDesc").value = box.content || "";
-  }
-}
-
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
@@ -793,6 +762,7 @@ function fillBranchSelect(selectedBranch) {
     sel.appendChild(opt);
   });
 }
+
 function fillRankSelect(branch, selectedRank) {
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
@@ -802,6 +772,8 @@ function fillRankSelect(branch, selectedRank) {
     if (r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
+}
+
 }
 function renderFileList(containerId, files) {
   const cont = document.getElementById(containerId);
