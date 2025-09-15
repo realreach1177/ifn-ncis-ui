@@ -4,13 +4,12 @@
 <meta charset="UTF-8" />
 <title>OrgChart Connection Web — Fixed</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<!-- Firebase SDKs (compat) -->
+<!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
-
 <style>
-html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, "Segoe UI", Tahoma, Arial; overflow:hidden; }
+html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0; font-family:system-ui, Segoe UI, Tahoma, Arial; overflow:hidden; }
 /* Toolbar (merged) */
 #toolbar { position:fixed; top:10px; left:50%; transform:translateX(-50%); background:#222; padding:10px 15px; border-radius:8px; z-index:200000; display:flex; justify-content:space-between; align-items:center; width:92%; max-width:1200px; gap:14px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
 .toolbar-left, .toolbar-right { display:flex; align-items:center; gap:8px; }
@@ -70,7 +69,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   resize: both;
   overflow: auto;
   font-size: 14px;
-  font-family: system-ui, "Segoe UI", Tahoma, Arial;
+  font-family: system-ui, Segoe UI, Tahoma, Arial;
   width: 300px;
   border: 1px solid #333;
   box-sizing: border-box;
@@ -142,6 +141,8 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .dead { background: #e53935; }
 .unknown { background: #212121; border: 1.5px solid #78909c; }
 
+/* Anchor style: tweak 'top' value below if you want anchor slightly higher/lower.
+   top: -10px  => anchor center = -10 + (16/2) = -2px relative to card top in world coords. */
 .anchor {
   position: absolute;
   width: 16px;
@@ -149,7 +150,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #000000;
-  top: -10px;               /* slightly above top but not too far */
+  top: -10px;      /* adjust this if you want the anchor a bit higher/lower */
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
@@ -200,7 +201,6 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <button id="deleteWebBtn" title="Delete Connection Web">Delete</button>
   </div>
 </div>
-
 <!-- Stage -->
 <div id="stage">
   <div id="viewport">
@@ -208,39 +208,31 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <div id="cards"></div>
   </div>
 </div>
-
 <!-- Editor -->
 <div id="editor">
   <header>Edit Item</header>
-
   <label>Profile Picture URL</label>
   <input id="fImage" type="url" placeholder="https://..." />
-
   <label>Name</label>
   <input id="fName" type="text" />
-
   <label>Status</label>
   <select id="fStatus">
     <option>Alive</option>
     <option>Dead</option>
     <option>Unknown</option>
   </select>
-
   <label>Branch</label>
   <select id="fBranch"></select>
-
   <label>Subbranch</label>
   <input id="fSubbranch" type="text" />
-
   <label>Rank</label>
   <select id="fRank"></select>
-
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
 
-  <!-- RELATED FILES: replaced with a dropdown populated from Firebase -->
-  <label>Related Files (select any that apply)</label>
-  <select id="fRelatedSelect" multiple size="8" style="width:100%; margin-top:6px;"></select>
+  <label>Related Files</label>
+  <!-- Multi-select populated from Firebase (suspects, insurgents, informants) -->
+  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;"></select>
   <div id="relatedList" class="file-list">(none)</div>
 
   <label>Other Files (external URL)</label>
@@ -270,9 +262,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 </div>
 
 <script>
-// -----------------------------
-// Firebase config - kept from your file
-// -----------------------------
+// Firebase config - replace if different
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -288,9 +278,7 @@ const auth = firebase.auth();
 const db = firebase.database();
 auth.signInAnonymously().catch(console.error);
 
-// -----------------------------
 // App state
-// -----------------------------
 let cards = [];
 let edges = [];
 let textBoxes = [];
@@ -342,9 +330,6 @@ const rankLists = {
   ]
 };
 
-// -----------------------------
-// Helpers
-// -----------------------------
 function contrast(hex) {
   hex = (hex || '').replace('#', '');
   if (hex.length !== 6) return '#000';
@@ -377,80 +362,89 @@ function linkListHTML(files) {
   return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
 }
 
-// -----------------------------
-// Related files select population (Firebase)
-// - populates #fRelatedSelect with optgroups for suspects/insurgents/informants (also checks sp/ip/ci keys)
-// -----------------------------
-async function fillRelatedSelect(currentSelected = []) {
+/* ---------- Related select population from Firebase ---------- */
+/* Loads entries from suspects, insurgents, informants and populates #fRelatedSelect.
+   'selected' should be an array of {url,name} objects that should be pre-selected. */
+async function populateRelatedChoices(selected = []) {
   const sel = document.getElementById("fRelatedSelect");
-  sel.innerHTML = "";
-
-  // paths and labels we want to check in the database
-  const pathGroups = [
-    { key: "suspects", label: "Suspects" },
-    { key: "insurgents", label: "Insurgents" },
-    { key: "informants", label: "Informants" },
-    // also accept short keys if the DB uses them
-    { key: "sp", label: "Suspects (sp)" },
-    { key: "ip", label: "Insurgents (ip)" },
-    { key: "ci", label: "Informants (ci)" }
+  sel.innerHTML = '';
+  const groups = [
+    { path: 'suspects', label: 'Suspects' },
+    { path: 'insurgents', label: 'Insurgents' },
+    { path: 'informants', label: 'Informants' }
   ];
-
-  for (const g of pathGroups) {
+  for (const g of groups) {
     try {
-      const snapshot = await db.ref(g.key).once('value');
-      const val = snapshot.val();
-      if (val) {
-        const optgroup = document.createElement('optgroup');
-        optgroup.label = g.label;
-        // val may be object keyed by id
-        Object.values(val).forEach(item => {
-          // Each item is expected to have { url, name } or similar
-          if (!item || (!item.url && !item.name)) return;
-          const opt = document.createElement('option');
-          opt.value = item.url || item.name;
-          opt.textContent = item.name || fileNameFromUrl(item.url || item.name);
-          // pre-select if it exists in currentSelected (array of {url,name})
-          if ((currentSelected || []).some(s => (s.url === opt.value) || (s.name === opt.textContent))) {
-            opt.selected = true;
-          }
-          optgroup.appendChild(opt);
-        });
-        sel.appendChild(optgroup);
-      }
-    } catch (err) {
-      console.warn("Failed to load related group", g.key, err);
+      const snap = await db.ref(g.path).once('value');
+      const val = snap.val();
+      if (!val) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = g.label;
+      Object.keys(val).forEach(k => {
+        const entry = val[k];
+        // Expecting entry to have { url, name } - fallback to key/url
+        const opt = document.createElement('option');
+        opt.value = entry.url || entry;
+        opt.textContent = entry.name || fileNameFromUrl(entry.url || entry) || k;
+        // preselect if in selected array
+        if ((selected || []).some(s => (s.url || s) === opt.value)) opt.selected = true;
+        optgroup.appendChild(opt);
+      });
+      sel.appendChild(optgroup);
+    } catch (e) {
+      console.warn('Failed loading related group', g.path, e);
     }
   }
 
-  // If no options created, show a placeholder option
-  if (!sel.querySelector('option')) {
-    const opt = document.createElement('option');
-    opt.disabled = true;
-    opt.textContent = "(no related files found in DB)";
-    sel.appendChild(opt);
-  }
+  // Update the simple list view under select to show currently chosen
+  const updateList = () => {
+    const chosen = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
+    const cont = document.getElementById('relatedList');
+    cont.innerHTML = '';
+    if (chosen.length === 0) { cont.textContent = '(none)'; return; }
+    const ul = document.createElement('ul');
+    ul.style.margin = '6px 0 0 0';
+    ul.style.paddingLeft = '18px';
+    chosen.forEach(c => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = c.url;
+      a.textContent = c.name;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    cont.appendChild(ul);
+  };
+  sel.addEventListener('change', updateList);
+  updateList();
 }
 
-// -----------------------------
-// Edge drawing & anchor positioning
-// anchorCenter: returns anchor center in world coordinates
-// -----------------------------
+/* ---------- Edge drawing & anchor positioning ---------- */
+/* Return anchor center in WORLD coordinates (i.e., the coordinate space used for SVG lines)
+   We compute anchor center from the model (card.x, card.y) and the known card dimensions and CSS anchor 'top'.
+   This prevents lines visually detaching when zooming/panning. */
 function anchorCenter(cardId) {
-  const cardEl = document.getElementById(cardId);
-  if (!cardEl) return null;
-  const anchorEl = cardEl.querySelector('.anchor');
-  if (!anchorEl) return null;
-  const rectAnchor = anchorEl.getBoundingClientRect();
-  const rectViewport = viewport.getBoundingClientRect();
-  const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
-  const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
-  return { x: (ax - tx) / scale, y: (ay - ty) / scale };
+  const cardModel = cards.find(c => c.id === cardId);
+  if (!cardModel) return null;
+  const CARD_WIDTH = 360;
+  const CARD_HEIGHT_APPROX = 120; // used only if needed (not used below)
+  // CSS anchor top used in .anchor rule
+  const ANCHOR_TOP_CSS = -10; // same as in CSS: top: -10px
+  const ANCHOR_HEIGHT = 16;
+  // anchor center offset relative to card top = top + half of anchor height
+  const anchorCenterOffsetY = ANCHOR_TOP_CSS + (ANCHOR_HEIGHT / 2); // e.g., -10 + 8 = -2
+  const x = cardModel.x + (CARD_WIDTH / 2);
+  const y = cardModel.y + anchorCenterOffsetY;
+  return { x, y };
 }
 
 function updateEdges() {
+  // Clear existing
   while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
   edges.forEach(edge => {
+    // Support both legacy and current edge shapes
     const aId = edge.a ? edge.a.card : (edge.from || null);
     const bId = edge.b ? edge.b.card : (edge.to || null);
     const aCard = cards.find(c => c.id === aId);
@@ -460,11 +454,12 @@ function updateEdges() {
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    // set coordinates in WORLD space — viewport is transformed with CSS scale/translate
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
     line.setAttribute("y2", posB.y);
-    line.setAttribute("stroke", "#ffffff"); // white as requested
+    line.setAttribute("stroke", "#ffffff");       // solid white as requested
     line.setAttribute("stroke-width", "4");
     line.setAttribute("stroke-linecap", "round");
     line.setAttribute("opacity", "0.95");
@@ -472,9 +467,7 @@ function updateEdges() {
   });
 }
 
-// -----------------------------
-// Rendering cards & textboxes
-// -----------------------------
+/* ---------- Rendering cards & textboxes ---------- */
 function makeCardView(card) {
   const existing = document.getElementById(card.id);
   if (existing) existing.remove();
@@ -501,7 +494,6 @@ function makeCardView(card) {
     </div>
     <div class="anchor" title="Drag to link"></div>
   `;
-
   // Click to select (but do not interfere when typing inside card's internal fields)
   c.addEventListener('click', e => {
     e.stopPropagation();
@@ -518,7 +510,7 @@ function makeCardView(card) {
     if(e.target.classList.contains('anchor')) return;
     dragging = true;
     c.classList.add('dragging');
-    try { c.setPointerCapture(e.pointerId); } catch {}
+    c.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - card.x;
     offset.y = wp.y - card.y;
@@ -549,6 +541,7 @@ function makeCardView(card) {
   return c;
 }
 
+/* Single, consolidated textbox view with native textarea for smooth resizing */
 function makeTextBoxView(box) {
   const existing = document.getElementById(box.id);
   if (existing) existing.remove();
@@ -583,11 +576,15 @@ function makeTextBoxView(box) {
   let dragging = false;
   let offset = {x:0,y:0};
   wrapper.addEventListener('pointerdown', e => {
-    if (e.target === textarea) return;
+    // If pointerdown originates from textarea (e.g. resize handle), do not start drag
+    if (e.target === textarea) {
+      // allow resize — but textarea pointerdown will have been stopped above
+      return;
+    }
     e.stopPropagation();
     dragging = true;
     wrapper.classList.add('dragging');
-    try { wrapper.setPointerCapture(e.pointerId); } catch {}
+    wrapper.setPointerCapture(e.pointerId);
     const wp = clientToWorld(e.clientX, e.clientY);
     offset.x = wp.x - box.x;
     offset.y = wp.y - box.y;
@@ -618,12 +615,13 @@ function makeTextBoxView(box) {
   // Observe size changes (native resize) to keep model in sync
   const ro = new ResizeObserver(entries => {
     for(const ent of entries) {
+      // ent.contentRect.width/height are in CSS px of the textarea
       const w = Math.round(ent.contentRect.width);
       const h = Math.round(ent.contentRect.height);
       box.width = w;
       box.height = h;
       wrapper.style.width = w + 'px';
-      snapshot();
+      snapshot(); // snapshot when resizing occurs
       updateEdges();
     }
   });
@@ -642,21 +640,19 @@ function makeTextBoxView(box) {
   return wrapper;
 }
 
-// -----------------------------
-// General render
-// -----------------------------
+/* ---------- General render ---------- */
 function render() {
+  // Clear layers then recreate
   cardsLayer.innerHTML = '';
   cards.forEach(makeCardView);
   textBoxes.forEach(makeTextBoxView);
   updateEdges();
 }
 
-// -----------------------------
-// Snapshot / undo / redo
-// -----------------------------
+/* ---------- Snapshot / undo / redo ---------- */
 function snapshot() {
   try {
+    // Deep clone current state
     const state = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(state);
     if (undoStack.length > 200) undoStack.shift();
@@ -667,7 +663,6 @@ function snapshot() {
 }
 
 function loadState(state) {
-  if (!state) return;
   cards.splice(0, cards.length, ...(state.cards || []));
   edges.splice(0, edges.length, ...(state.edges || []));
   textBoxes.splice(0, textBoxes.length, ...(state.textBoxes || []));
@@ -675,7 +670,7 @@ function loadState(state) {
   ty = state.ty || 0;
   scale = state.scale || 1;
   applyTransform();
-  render();
+  render();   // re-render DOM after restoring state
 }
 
 function undo() {
@@ -684,7 +679,7 @@ function undo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     redoStack.push(current);
     const prev = undoStack.pop();
-    loadState(prev);
+    loadState(prev);   // loadState already calls render()
     toast("Undo");
   } catch (e) { console.error(e); }
 }
@@ -695,35 +690,29 @@ function redo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(current);
     const nxt = redoStack.pop();
-    loadState(nxt);
+    loadState(nxt);  // loadState now does render()
     toast("Redo");
   } catch (e) { console.error(e); }
 }
 
-// -----------------------------
-// Selection / Editor
-// -----------------------------
+/* ---------- Selection / Editor ---------- */
 function deselect() {
   if (selected) {
     let el = document.getElementById(selected);
     if (el) el.classList.remove("selected");
-    selected = null; selectedType = null;
+    selected = null; 
+    selectedType = null;
   }
   closeEditor();
 }
 function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-// openEditor is async because it awaits filling the related-select from Firebase
 async function openEditor(id, type) {
-  const ed = document.getElementById("editor");
-  // show everything by default; we'll hide parts when textbox selected
-  document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
-  document.querySelector("#editor header").style.display = "block";
+  // Show editor
+  let ed = document.getElementById("editor");
+  ed.style.display = "block";
 
-  selected = id;
-  selectedType = type;
-
-  // Reset fields
+  // Reset all fields
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
@@ -731,19 +720,25 @@ async function openEditor(id, type) {
   document.getElementById("fSubbranch").value = "";
   document.getElementById("fStatus").value = "Unknown";
   document.getElementById("fDesc").value = "";
+
+  // Get the card if type=card
+  const card = (type === "card") ? cards.find(c => c.id === id) : null;
+
+  // Populate related files select from Firebase (and preselect card's existing relatedFiles)
+  await populateRelatedChoices(card ? (card.data.relatedFiles || []) : []);
+
+  // Reset other fields view
   document.getElementById("otherList").innerHTML = "(none)";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
 
-  // If editing a card, load its data and populate related files choose list
-  if (type === "card") {
-    const card = cards.find(c => c.id === id);
-    if (!card) { ed.style.display = "none"; return; }
+  selected = id; 
+  selectedType = type;
 
-    // populate related select from firebase, mark preselected items from card.data.relatedFiles
-    await fillRelatedSelect(card.data.relatedFiles || []);
-
-    // fill other fields with data
+  // Show/hide appropriate fields
+  if (type === "card" && card) {
+    // make all controls visible
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
     document.getElementById("fImage").value = card.data.image || "";
     document.getElementById("fName").value = card.data.name || "";
     fillBranchSelect(card.data.branch);
@@ -751,29 +746,28 @@ async function openEditor(id, type) {
     document.getElementById("fSubbranch").value = card.data.subbranch || "";
     document.getElementById("fStatus").value = card.data.status || "Unknown";
     document.getElementById("fDesc").value = card.data.desc || "";
-
-    // render file lists
-    renderFileList("relatedList", card.data.relatedFiles || []);
-    renderFileList("otherList", card.data.otherFiles || []);
-    ed.style.display = "block";
-  } else {
-    // textbox editing: hide most controls, only show header and description
+    renderFileList("otherList", card.data.otherFiles);
+    // relatedList UI is already handled by populateRelatedChoices
+  } else if (type === "textbox") {
+    // Hide everything except header and description textarea
     document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
     document.querySelector("#editor header").style.display = "block";
 
     const descLabel = Array.from(document.querySelectorAll("#editor label"))
       .find(l => l.textContent.includes("Short Description"));
     if (descLabel) descLabel.style.display = "block";
+
     document.getElementById("fDesc").style.display = "block";
 
     const box = textBoxes.find(t => t.id === id);
     if (box) document.getElementById("fDesc").value = box.content || "";
-    ed.style.display = "block";
   }
 }
 
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
+  // If editor is in textbox-only mode, fBranch may not exist; guard
+  if (!sel) return;
   sel.innerHTML = "";
   Object.keys(branchColors).forEach(b => {
     const opt = document.createElement("option");
@@ -784,6 +778,7 @@ function fillBranchSelect(selectedBranch) {
 }
 function fillRankSelect(branch, selectedRank) {
   const sel = document.getElementById("fRank");
+  if (!sel) return;
   sel.innerHTML = "";
   (rankLists[branch] || ['None']).forEach(r => {
     const opt = document.createElement("option");
@@ -794,6 +789,7 @@ function fillRankSelect(branch, selectedRank) {
 }
 function renderFileList(containerId, files) {
   const cont = document.getElementById(containerId);
+  if (!cont) return;
   cont.innerHTML = "";
   if (!files || files.length === 0) {
     cont.textContent = "(none)";
@@ -814,15 +810,12 @@ function renderFileList(containerId, files) {
   cont.appendChild(ul);
 }
 
-// -----------------------------
-// Editor handlers
-// - removed local file uploads to avoid using storage / filling DB
-// -----------------------------
+/* ---------- Editor button handlers ---------- */
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') return alert("No card selected");
+  if(!selected || selectedType !== 'card') { toast("No card selected"); return; }
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if(!url) return alert("Please enter a URL");
+  if(!url) { alert("Please enter a URL"); return; }
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
@@ -839,7 +832,6 @@ document.getElementById("btnSave").onclick = ()=>{
   if(selectedType === 'card'){
     const card = cards.find(c=>c.id === selected);
     if(!card) return;
-
     card.data.image = document.getElementById("fImage").value.trim();
     card.data.name = document.getElementById("fName").value.trim();
     card.data.branch = document.getElementById("fBranch").value;
@@ -849,12 +841,15 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
 
-    // Save related files from the select to card.data.relatedFiles
+    // Save related files selection into card.data.relatedFiles
     const sel = document.getElementById("fRelatedSelect");
-    const selectedOptions = Array.from(sel && sel.selectedOptions ? sel.selectedOptions : []);
-    card.data.relatedFiles = selectedOptions.map(opt => ({ url: opt.value, name: opt.textContent }));
+    if (sel) {
+      const chosen = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
+      card.data.relatedFiles = chosen;
+      renderFileList("relatedList", card.data.relatedFiles);
+    }
 
-    // Re-render card & lists
+    // Re-render card
     const oldEl = document.getElementById(card.id);
     if(oldEl) oldEl.remove();
     makeCardView(card);
@@ -876,9 +871,7 @@ document.getElementById("btnSave").onclick = ()=>{
 document.getElementById("btnCancel").onclick = closeEditor;
 document.getElementById("fBranch").addEventListener("change", (e)=>{ fillRankSelect(e.target.value, null); });
 
-// -----------------------------
-// Create new elements
-// -----------------------------
+/* ---------- Create new elements ---------- */
 function createDefaultCard(pos){
   const id = "c" + Math.random().toString(36).slice(2,9);
   const newCard = {
@@ -905,9 +898,7 @@ function createDefaultTextbox(pos){
   return { id, x: snapToGrid(pos.x), y: snapToGrid(pos.y), content: "", width: 300, height: null };
 }
 
-// -----------------------------
-// Toolbar bindings
-// -----------------------------
+/* ---------- Toolbar bindings ---------- */
 document.getElementById("addProfileBtn").onclick = ()=>{
   const pos = { x: 100, y: 100 };
   const newCard = createDefaultCard(pos);
@@ -942,9 +933,8 @@ document.getElementById("deleteSelectedBtn").onclick = async function(){
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
-// -----------------------------
-// Stage interactions
-// -----------------------------
+/* ---------- Stage interactions ---------- */
+// Double-click stage to add a card (guard when editing text)
 stage.addEventListener("dblclick", e=>{
   if (editingTextLabel) return;
   if(e.target.closest(".card") || e.target.classList.contains("anchor") || e.target.closest("#toolbar") || e.target.classList.contains("textbox")) return;
@@ -974,29 +964,36 @@ document.getElementById("searchBox").oninput = function(){
     el.style.display = !query || text.includes(query) ? "block" : "none";
   });
 
-  if (matches.length === 1) focusCard(matches[0]);
+  // If exactly one match, focus it
+  if (matches.length === 1) {
+    focusCard(matches[0]);
+  }
 };
 
 function focusCard(card){
   const el = document.getElementById(card.id);
   if(!el) return;
+  // center card in viewport
   const rect = stage.getBoundingClientRect();
-  const cardCenterX = card.x + 180;
-  const cardCenterY = card.y + 90;
+  const cardCenterX = card.x + 180; // half of 360 width
+  const cardCenterY = card.y + 90;  // approx mid-height of card (top + 90)
   tx = rect.width / 2 - cardCenterX * scale;
   ty = rect.height / 2 - cardCenterY * scale;
   applyTransform();
   updateEdges();
+
+  // flash highlight
   el.classList.remove('flash-highlight');
   void el.offsetWidth;
   el.classList.add('flash-highlight');
 }
 
-// Zoom
+/* ---------- Zoom ---------- */
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
   const mousePos = clientToWorld(e.clientX, e.clientY);
+  const oldScale = scale;
   scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
   scale = Math.min(Math.max(scale, 0.25), 4);
   tx = e.clientX - mousePos.x * scale;
@@ -1017,7 +1014,7 @@ stage.addEventListener('pointerdown', e => {
   panOrigin.tx = tx;
   panOrigin.ty = ty;
   stage.style.cursor = 'grabbing';
-  try { stage.setPointerCapture(e.pointerId); } catch {}
+  stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e => {
   if (!isPanning) return;
@@ -1043,9 +1040,7 @@ stage.addEventListener('pointercancel', e => {
   snapshot();
 });
 
-// -----------------------------
-// Anchor linking (create edges) - uses anchorCenter for robust coordinates
-// -----------------------------
+/* ---------- Anchor linking (create edges) ---------- */
 let anchorDrag = { active:false, startCardId:null, tmpLine:null };
 
 stage.addEventListener('pointerdown', e => {
@@ -1058,7 +1053,7 @@ stage.addEventListener('pointerdown', e => {
 
     const svgNS = "http://www.w3.org/2000/svg";
     anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
-    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff');
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff'); // white line
     anchorDrag.tmpLine.setAttribute('stroke-width', '3');
     anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(anchorDrag.tmpLine);
@@ -1078,6 +1073,7 @@ stage.addEventListener('pointerdown', e => {
 stage.addEventListener('pointermove', e => {
   if (!anchorDrag.active) return;
   const pos = clientToWorld(e.clientX, e.clientY);
+
   const startPos = anchorCenter(anchorDrag.startCardId);
   if (anchorDrag.tmpLine && startPos) {
     anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -1130,9 +1126,7 @@ stage.addEventListener('pointerup', e => {
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
 
-// -----------------------------
-// Deselect on stage click
-// -----------------------------
+/* ---------- Deselect on stage click ---------- */
 stage.addEventListener("click", e=>{
   if(e.target === stage || e.target === viewport){
     if(selected){
@@ -1143,18 +1137,14 @@ stage.addEventListener("click", e=>{
   }
 });
 
-// -----------------------------
-// Firebase web save/load/delete & web list
-// -----------------------------
+/* ---------- Firebase: save/load/delete & web list ---------- */
 const webNameInput = document.getElementById('webNameInput');
 const webListDropdown = document.getElementById('webListDropdown');
 let currentWebListener = null;
 
 async function subscribeToWeb(name) {
-  if (currentWebListener) {
-    if(webListDropdown.value) {
-      db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
-    }
+  if (currentWebListener && webListDropdown.value) {
+    db.ref(`connectionWebs/${webListDropdown.value}`).off('value', currentWebListener);
     currentWebListener = null;
   }
   if(!name) return;
@@ -1168,6 +1158,7 @@ async function subscribeToWeb(name) {
       render();
       return;
     }
+    // Restore saved state
     cards.splice(0, cards.length, ...(data.cards || []));
     edges.splice(0, edges.length, ...(data.edges || []));
     textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
@@ -1201,6 +1192,7 @@ webNameInput.addEventListener("change", (e) => {
 async function saveCurrentWeb() {
   const name = webNameInput.value.trim();
   if (!name) { alert("Enter a Connection Web name"); return; }
+  // Deep-clone to strip any DOM references
   const data = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() }));
   try { await db.ref(`connectionWebs/${name}`).set(data); toast("Connection Web saved!"); }
   catch (e) { alert("Save failed: " + e.message); }
@@ -1208,8 +1200,8 @@ async function saveCurrentWeb() {
 async function deleteCurrentWeb() {
   const name = webListDropdown.value;
   if (!name) { alert("Select a Connection Web to delete"); return; }
-  const confirmed = await customConfirm(`Delete "${name}"?`);
-  if (!confirmed) { toast("Deletion cancelled"); return; }
+  const confirmed = prompt(`Type DELETE to confirm deletion of "${name}"`);
+  if (confirmed !== "DELETE") { alert("Deletion cancelled"); return; }
   try {
     if (currentWebListener) { db.ref(`connectionWebs/${name}`).off('value', currentWebListener); currentWebListener = null; }
     await db.ref(`connectionWebs/${name}`).remove();
@@ -1243,19 +1235,19 @@ document.getElementById("loadWebBtn").onclick = () => {
 };
 document.getElementById("deleteWebBtn").onclick = deleteCurrentWeb;
 
-// -----------------------------
-// Misc
-// -----------------------------
+/* ---------- Misc ---------- */
+// Deselect on background / stage click (extra)
 document.addEventListener("click", (e) => {
   if (e.target.closest('#toolbar') || e.target.closest('#editor')) return;
 }, false);
 
+// Initialize
 document.addEventListener("DOMContentLoaded", ()=>{
   refreshWebList();
   render();
+  // initial snapshot
   snapshot();
 });
-
 function customConfirm(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirmModal");
