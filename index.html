@@ -234,13 +234,11 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
 
-  <label>Related Files (external URL)</label>
-  <input id="fRelatedUrl" type="url" placeholder="https://example.com/file.pdf" />
-  <input id="fRelatedName" type="text" placeholder="Display name for hyperlink" />
-  <div style="display:flex; gap:8px; margin-top:6px;">
-    <button id="btnAddRelated" type="button">Add URL</button>
-  </div>
-  <div id="relatedList" class="file-list">(none)</div>
+  <label>Related Files</label>
+<select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;">
+  <!-- Options will be loaded from Firebase (suspects, insurgents, informants) -->
+</select>
+
 
   <label>Other Files (external URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
@@ -366,6 +364,34 @@ function snapToGrid(v){ return Math.round(v / snap) * snap; }
 
 function linkListHTML(files) {
   return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
+}
+
+async function fillRelatedSelect(selected = []) {
+ const sel = document.getElementById("fRelatedSelect");
+card.data.relatedFiles = Array.from(sel.selectedOptions).map(opt => ({
+  url: opt.value,
+  name: opt.textContent
+}));
+
+
+  const paths = ["suspects", "insurgents", "informants"];
+  for (let path of paths) {
+    const snap = await get(child(ref(db), path));
+    if (snap.exists()) {
+      const group = document.createElement("optgroup");
+      group.label = path;
+      Object.values(snap.val()).forEach(file=>{
+        const opt = document.createElement("option");
+        opt.value = file.url;
+        opt.textContent = file.name || fileNameFromUrl(file.url);
+        if (selected.some(s => s.url === opt.value)) {
+          opt.selected = true;
+        }
+        group.appendChild(opt);
+      });
+      sel.appendChild(group);
+    }
+  }
 }
 
 /* ---------- Edge drawing & anchor positioning ---------- */
@@ -660,13 +686,17 @@ function deselect() {
   if (selected) {
     let el = document.getElementById(selected);
     if (el) el.classList.remove("selected");
-    selected = null; selectedType = null;
+    selected = null; 
+    selectedType = null;
   }
   closeEditor();
 }
-function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-function openEditor(id, type) {
+function closeEditor() { 
+  document.getElementById("editor").style.display = "none"; 
+}
+
+async function openEditor(id, type) {
   let ed = document.getElementById("editor");
   ed.style.display = "block";
 
@@ -678,18 +708,52 @@ function openEditor(id, type) {
   document.getElementById("fSubbranch").value = "";
   document.getElementById("fStatus").value = "Unknown";
   document.getElementById("fDesc").value = "";
-  document.getElementById("relatedList").innerHTML = "(none)";
+
+  // Get the card if type=card
+  const card = (type === "card") ? cards.find(c => c.id === id) : null;
+
+  // Populate related files select from Firebase
+  await fillRelatedSelect(card ? card.data.relatedFiles : []);
+
+  // Reset other fields
   document.getElementById("otherList").innerHTML = "(none)";
-  document.getElementById("fRelatedUrl").value = "";
-  document.getElementById("fRelatedName").value = "";
   document.getElementById("fOtherUrl").value = "";
   document.getElementById("fOtherName").value = "";
   document.getElementById("fImageFile").value = "";
-  document.getElementById("fRelatedFile").value = "";
   document.getElementById("fOtherFile").value = "";
 
   selected = id; 
   selectedType = type;
+
+  if (type === "card" && card) {
+    document.getElementById("fImage").value = card.data.image || "";
+    document.getElementById("fName").value = card.data.name || "";
+    fillBranchSelect(card.data.branch);
+    fillRankSelect(card.data.branch, card.data.rank);
+    document.getElementById("fSubbranch").value = card.data.subbranch || "";
+    document.getElementById("fStatus").value = card.data.status || "Unknown";
+    document.getElementById("fDesc").value = card.data.desc || "";
+    // Related files handled by fillRelatedSelect
+    renderFileList("otherList", card.data.otherFiles);
+  } 
+  else if (type === "textbox") {
+    // Hide everything except description
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
+    document.querySelector("#editor header").style.display = "block";
+
+    const descLabel = Array.from(document.querySelectorAll("#editor label"))
+      .find(l => l.textContent.includes("Short Description"));
+    if (descLabel) descLabel.style.display = "block";
+
+    document.getElementById("fDesc").style.display = "block";
+
+    const box = textBoxes.find(t => t.id === id);
+    if (box) document.getElementById("fDesc").value = box.content || "";
+  }
+}
+
+
+
 
   if (type === "card") {
     // Show everything
