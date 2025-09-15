@@ -340,79 +340,6 @@ function makeCardView(card) {
   return c;
 }
 
-function makeTextBoxView(box) {
-  const t = document.createElement('div');
-  t.className = 'textbox';
-  t.id = box.id;
-  t.style.left = box.x + 'px';
-  t.style.top = box.y + 'px';
-  t.textContent = box.content || "";
-  t.contentEditable = true;
-  t.spellcheck = false;
-  t.style.minHeight = '50px';
-  t.style.width = box.width ? box.width + 'px' : '300px';
-
-  // Local dragging state
-  let dragging = false;
-  let offset = { x: 0, y: 0 };
-
-  t.addEventListener('pointerdown', e => {
-    e.stopPropagation();
-    dragging = true;
-    t.classList.add('dragging');
-    t.setPointerCapture(e.pointerId);
-    const wp = clientToWorld(e.clientX, e.clientY);
-    offset.x = wp.x - box.x;
-    offset.y = wp.y - box.y;
-  });
-
-  t.addEventListener('pointermove', e => {
-    if(!dragging || !(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
-    const wp = clientToWorld(e.clientX, e.clientY);
-    box.x = snapToGrid(wp.x - offset.x);
-    box.y = snapToGrid(wp.y - offset.y);
-    t.style.left = box.x + 'px';
-    t.style.top = box.y + 'px';
-    renderMinimap();
-  });
-
-  t.addEventListener('pointerup', e => {
-    dragging = false;
-    t.classList.remove('dragging');
-    try { t.releasePointerCapture(e.pointerId); } catch {}
-    snapshot();
-  });
-
-  t.addEventListener('pointercancel', e => {
-    dragging = false;
-    t.classList.remove('dragging');
-    try { t.releasePointerCapture(e.pointerId); } catch {}
-  });
-
-  t.addEventListener('input', e => {
-    editingTextLabel = true;
-    box.content = t.textContent;
-  });
-
-  t.addEventListener('focus', e => { editingTextLabel = true; });
-  t.addEventListener('blur', e => { editingTextLabel = false; });
-
-  t.addEventListener('click', e => {
-    e.stopPropagation();
-    if(selected){ 
-      const prev = document.getElementById(selected); 
-      if(prev) prev.classList.remove('selected'); 
-    }
-    selected = box.id;
-    selectedType = 'textbox';
-    t.classList.add('selected');
-    openEditor(box.id, 'textbox');
-  });
-
-  cardsLayer.appendChild(t);
-  return t;
-}
-
 // --- Only one renderMinimap function, at top level
 function renderMinimap() {
   minimapSVG.innerHTML = "";
@@ -971,31 +898,6 @@ stage.addEventListener("click", e=>{
   }
 });
 
-// Minimap
-function renderMinimap(){
-  minimapSVG.innerHTML = "";
-  const sx = 0.08, sy = 0.08;
-  cards.forEach(c=>{
-    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    rect.setAttribute("x", c.x * sx);
-    rect.setAttribute("y", c.y * sy);
-    rect.setAttribute("width", 360 * sx);
-    rect.setAttribute("height", 120 * sy);
-    rect.setAttribute("fill", (c.data.branchColor||"#777"));
-    rect.setAttribute("fill-opacity", "0.9");
-    minimapSVG.appendChild(rect);
-  });
-  textBoxes.forEach(t=>{
-    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    rect.setAttribute("x", t.x * sx);
-    rect.setAttribute("y", t.y * sy);
-    rect.setAttribute("width", 300 * sx);
-    rect.setAttribute("height", 60 * sy);
-    rect.setAttribute("fill", "#999");
-    rect.setAttribute("fill-opacity", "0.7");
-    minimapSVG.appendChild(rect);
-  });
-}
 
 // Live sync + web list
 const webNameInput = document.getElementById('webNameInput');
