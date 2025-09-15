@@ -71,6 +71,9 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 /* Toasts */
 .toast { position:fixed; left:50%; bottom:20px; background:#111; padding:12px 24px; color:#fff; border-radius:6px;
   box-shadow:0 0 12px rgba(0,0,0,0.7); transform:translateX(-50%); opacity:0.95; user-select:none; z-index:999999; pointer-events:none; }
+/* flash highlight for search focus */
+@keyframes flash { 0%{ box-shadow:0 0 0 0 rgba(255,215,0,0.9);} 50%{ box-shadow:0 0 25px 8px rgba(255,215,0,0.9);} 100%{ box-shadow:0 0 0 0 rgba(255,215,0,0); } }
+.flash-highlight { animation: flash 1s ease-out 2; }
 </style>
 </head>
 <body>
@@ -253,30 +256,37 @@ function linkListHTML(files) {
 }
 
 /* ---------- Edge drawing & anchor positioning ---------- */
-/* Return anchor center in WORLD coordinates (i.e., the coordinate space used for SVG lines) */
+/* Return anchor center in WORLD coordinates (i.e., the coordinate space used for SVG lines)
+   NOTE: replaced DOM-measurement approach with model-based computation so lines don't split
+   when zooming/panning. Cards are stored in 'cards' with x,y being world coords (top-left). */
 function anchorCenter(cardId) {
-  const cardEl = document.getElementById(cardId);
-  if (!cardEl) return null;
-  const anchorEl = cardEl.querySelector('.anchor') || cardEl;
-  const rectAnchor = anchorEl.getBoundingClientRect();
-  const rectViewport = viewport.getBoundingClientRect();
-  const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
-  const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
-  // convert screen px to world coords (same mapping used throughout)
-  return { x: (ax - tx) / scale, y: (ay - ty) / scale };
+  const card = cards.find(c => c.id === cardId);
+  if (!card) return null;
+  // Card width is 360 in CSS; anchor is centered horizontally on top.
+  // Use card model coords to compute anchor center in world coordinates.
+  const cardWidth = 360;
+  // Anchor visually is a bit above the card (top:-6px + transform), but
+  // using card.y is a stable "top edge" reference. You can tweak offset if needed.
+  const anchorX = card.x + cardWidth / 2;
+  const anchorY = card.y; // top edge of the card (anchor sits around here)
+  return { x: anchorX, y: anchorY };
 }
 
 function updateEdges() {
   // Clear existing
   while (wiresLayer.firstChild) wiresLayer.removeChild(wiresLayer.firstChild);
   edges.forEach(edge => {
-    const aCard = cards.find(c => c.id === edge.a.card);
-    const bCard = cards.find(c => c.id === edge.b.card);
+    // Support both legacy and current edge shapes
+    const aId = edge.a ? edge.a.card : (edge.from || null);
+    const bId = edge.b ? edge.b.card : (edge.to || null);
+    const aCard = cards.find(c => c.id === aId);
+    const bCard = cards.find(c => c.id === bId);
     if (!aCard || !bCard) return;
     const posA = anchorCenter(aCard.id);
     const posB = anchorCenter(bCard.id);
     if (!posA || !posB) return;
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    // set coordinates in WORLD space — viewport is transformed with CSS scale/translate
     line.setAttribute("x1", posA.x);
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
@@ -781,14 +791,17 @@ stage.addEventListener("dblclick", e=>{
   makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 });
 
-// Search filtering
+// Search filtering + focus single-match
 document.getElementById("searchBox").oninput = function(){
   const query = this.value.toLowerCase();
+  let matches = [];
   cards.forEach(card=>{
     const el = document.getElementById(card.id);
     if(!el) return;
     const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
-    el.style.display = !query || text.includes(query) ? "flex" : "none";
+    const shown = !query || text.includes(query);
+    el.style.display = shown ? "flex" : "none";
+    if (shown && query && text.includes(query)) matches.push(card);
   });
   textBoxes.forEach(box=>{
     const el = document.getElementById(box.id);
@@ -796,9 +809,32 @@ document.getElementById("searchBox").oninput = function(){
     const text = (box.content || "").toLowerCase();
     el.style.display = !query || text.includes(query) ? "block" : "none";
   });
+
+  // If exactly one match, focus it
+  if (matches.length === 1) {
+    focusCard(matches[0]);
+  }
 };
 
-// Zoom
+function focusCard(card){
+  const el = document.getElementById(card.id);
+  if(!el) return;
+  // center card in viewport
+  const rect = stage.getBoundingClientRect();
+  const cardCenterX = card.x + 180; // half of 360 width
+  const cardCenterY = card.y + 90;  // approx mid-height of card (top + 90)
+  tx = rect.width / 2 - cardCenterX * scale;
+  ty = rect.height / 2 - cardCenterY * scale;
+  applyTransform();
+  updateEdges();
+
+  // flash highlight
+  el.classList.remove('flash-highlight');
+  void el.offsetWidth;
+  el.classList.add('flash-highlight');
+}
+
+/* ---------- Zoom ---------- */
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
@@ -867,6 +903,7 @@ stage.addEventListener('pointerdown', e => {
     anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(anchorDrag.tmpLine);
 
+    // Use model-based anchor center
     const startPos = anchorCenter(anchorDrag.startCardId);
     if (startPos) {
       anchorDrag.tmpLine.setAttribute('x1', startPos.x);
@@ -884,6 +921,12 @@ stage.addEventListener('pointermove', e => {
   if (anchorDrag.tmpLine) {
     anchorDrag.tmpLine.setAttribute('x2', pos.x);
     anchorDrag.tmpLine.setAttribute('y2', pos.y);
+    // keep x1,y1 synced with model start (in case the start card moves)
+    const startPos = anchorCenter(anchorDrag.startCardId);
+    if (startPos) {
+      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
+    }
   }
 });
 
@@ -907,11 +950,14 @@ stage.addEventListener('pointerup', e => {
     return;
   }
 
-  // Prevent duplicate edges
-  if (!edges.some(edge =>
-    (edge.a.card === anchorDrag.startCardId && edge.b.card === targetCard) ||
-    (edge.a.card === targetCard && edge.b.card === anchorDrag.startCardId)
-  )) {
+  // Prevent duplicate edges (support saved shape)
+  const exists = edges.some(edge=>{
+    const aId = edge.a ? edge.a.card : (edge.from || null);
+    const bId = edge.b ? edge.b.card : (edge.to || null);
+    return (aId === anchorDrag.startCardId && bId === targetCard) || (aId === targetCard && bId === anchorDrag.startCardId);
+  });
+
+  if (!exists) {
     const newEdge = {
       id: "e" + Math.random().toString(36).slice(2,9),
       a: { card: anchorDrag.startCardId },
