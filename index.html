@@ -27,135 +27,33 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
   background-size:40px 40px;
 }
-#viewport { position:absolute; left:0; top:0; width:100%; height:100%; transform-origin:0 0; overflow:visible; }
+/* Keep the viewport as your workspace. It's transform-origin: 0 0 and we apply translate/scale to it */
+#viewport { position:absolute; left:0; top:0; width:10000px; height:10000px; transform-origin:0 0; overflow:visible; }
+/* SVG wires inside viewport so they scale with it; coordinates are set in world units */
 #wires { position:absolute; left:0; top:0; width:100%; height:100%; overflow:visible; pointer-events:none; z-index:1; }
 #cards { position:absolute; left:0; top:0; width:100%; height:100%; }
 /* Cards and textboxes */
 .card, .textbox-wrapper {
-  position: absolute;
-  padding: 0;
-  box-sizing: border-box;
-  user-select: text;
-  cursor: grab;
-  z-index: 10;
-  transition: box-shadow 0.15s;
+  position:absolute; padding:0; box-sizing:border-box;
+  user-select:text; cursor:grab; z-index:10; transition:box-shadow 0.15s;
 }
-
-.card {
-  position: relative;  /* required so .anchor can position itself */
-  width: 360px;
-  background: #222;
-  color: #e0e0e0;
-  border-radius: 10px;
-  padding: 15px 18px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  overflow: visible;   /* so anchor isn't clipped */
-}
-
-.textbox-wrapper {
-  background: transparent;
-  border-radius: 8px;
-  padding: 6px;
-}
-
-.textbox-wrapper .textbox {
-  background: #222;
-  color: #e0e0e0;
-  border-radius: 8px;
-  padding: 10px;
-  min-height: 50px;
-  resize: both;
-  overflow: auto;
-  font-size: 14px;
-  font-family: system-ui, Segoe UI, Tahoma, Arial;
-  width: 300px;
-  border: 1px solid #333;
-  box-sizing: border-box;
-}
-
-.card.dragging, .textbox-wrapper.dragging {
-  box-shadow: 0 0 24px 2px var(--branchGlow, #4caf50);
-}
-
-.card.selected, .textbox-wrapper.selected {
-  outline: 3px solid var(--selectedHighlightColor, #ffc107);
-  box-shadow: 0 0 20px 4px var(--selectedHighlightColor, #ffc107);
-}
-
-.img {
-  width: 75px;
-  height: 75px;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-right: 6px;
-  border: 2px solid #777;
-  box-shadow: 0 0 6px 2px rgba(0,0,0,0.6);
-}
-
-.info {
-  flex: 1;
-  overflow: hidden;
-}
-
-.name {
-  font-weight: 700;
-  font-size: 18px;
-  margin: 0 0 6px 0;
-  letter-spacing: 1.2px;
-}
-
-.rank, .desc {
-  margin: 2px 0;
-  color: #cfd8dc;
-  font-size: 14px;
-}
-
-.bar {
-  display: inline-block;
-  margin: 8px 0;
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.status {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.alive { background: #4caf50; }
-.dead { background: #e53935; }
-.unknown { background: #212121; border: 1.5px solid #78909c; }
-
-/* anchor dot sits near top-center of card; tweak top to move up/down */
-.anchor {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;           /* white for max contrast */
-  border: 2px solid #000000;     /* black border */
-  top: -6px;                     /* small negative to float slightly above card top */
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 9999;
-  cursor: crosshair;
-}
-
+.card { position:relative; width:360px; background:#222; color:#e0e0e0; border-radius:10px; padding:15px 18px; display:flex; align-items:flex-start; gap:12px; overflow:visible; }
+.textbox-wrapper { background:transparent; border-radius:8px; padding:6px; }
+.textbox-wrapper .textbox { background:#222; color:#e0e0e0; border-radius:8px; padding:10px; min-height:50px; resize:both; overflow:auto; font-size:14px; font-family:system-ui, Segoe UI, Tahoma, Arial; width:300px; border:1px solid #333; box-sizing:border-box; }
+.card.dragging, .textbox-wrapper.dragging { box-shadow:0 0 24px 2px var(--branchGlow, #4caf50); }
+.card.selected, .textbox-wrapper.selected { outline:3px solid var(--selectedHighlightColor, #ffc107); box-shadow:0 0 20px 4px var(--selectedHighlightColor, #ffc107); }
+.img { width:75px; height:75px; border-radius:50%; object-fit:cover; margin-right:6px; border:2px solid #777; box-shadow:0 0 6px 2px rgba(0,0,0,0.6); }
+.info { flex:1; overflow:hidden; }
+.name { font-weight:700; font-size:18px; margin:0 0 6px 0; letter-spacing:1.2px; }
+.rank, .desc { margin:2px 0; color:#cfd8dc; font-size:14px; }
+.bar { display:inline-block; margin:8px 0; border-radius:4px; padding:4px 12px; font-weight:600; font-size:15px; }
+.status { margin-top:10px; display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; }
+.dot { width:12px; height:12px; border-radius:50%; display:inline-block; }
+.alive { background:#4caf50; }
+.dead { background:#e53935; }
+.unknown { background:#212121; border:1.5px solid #78909c; }
+/* Anchor dot - top of card but slightly lowered so it appears "attached" */
+.anchor { position:absolute; width:16px; height:16px; border-radius:50%; background:#ffffff; border:2px solid #000000; top:-10px; left:50%; transform:translateX(-50%); z-index:9999; cursor:crosshair; }
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
   box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
@@ -229,10 +127,9 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   <label>Short Description</label>
   <textarea id="fDesc"></textarea>
 
-  <!-- Related files SELECT — populated from Firebase (sp/ip/ci fallback suspects/insurgents/informants) -->
-  <label>Related Files</label>
-  <select id="fRelatedSelect" multiple size="6" style="width:100%; margin-top:6px;"></select>
-  <div id="relatedList" class="file-list">(none)</div>
+  <label>Related Files (choose from DB)</label>
+  <select id="fRelatedSelect" multiple size="8" style="width:100%; margin-top:6px;"></select>
+  <div id="relatedList" class="file-list" style="margin-top:8px;">(none)</div>
 
   <label>Other Files (external URL)</label>
   <input id="fOtherUrl" type="url" placeholder="https://example.com/file.pdf" />
@@ -247,6 +144,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
     <button id="btnCancel" type="button">Cancel</button>
   </div>
 </div>
+
 <!-- Custom Confirm Modal -->
 <div id="confirmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); 
      z-index:1000000; justify-content:center; align-items:center;">
@@ -260,7 +158,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 </div>
 
 <script>
-// Firebase config - replace if different
+// Firebase config - replace if different (kept original values you had)
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -360,88 +258,21 @@ function linkListHTML(files) {
   return (files||[]).map(f => `<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('');
 }
 
-/* ---------- Related files select population ---------- */
-/*
-  We'll populate #fRelatedSelect with entries fetched from several DB paths.
-  The DB paths we look for (in order) are:
-     'sp' (suspect), 'ip' (insurgent), 'ci' (informant)
-  and we also fallback to 'suspects', 'insurgents', 'informants' if the short codes are not present.
-  Each DB node is expected to hold objects with fields { url: "...", name: "..." } or strings (URL).
-*/
-async function fetchFilesFromPath(path) {
-  try {
-    const snap = await db.ref(path).once('value');
-    const val = snap.val();
-    if (!val) return [];
-    // convert to array of {url,name}
-    return Object.values(val).map(item => {
-      if (typeof item === 'string') return { url: item, name: fileNameFromUrl(item) };
-      return { url: item.url || item.file || item.link || '', name: item.name || fileNameFromUrl(item.url || item.file || item.link || '') };
-    }).filter(f => f.url);
-  } catch (e) {
-    console.warn("Failed to read", path, e);
-    return [];
-  }
-}
-
-async function fillRelatedSelect(preselected = []) {
-  const sel = document.getElementById("fRelatedSelect");
-  sel.innerHTML = "";
-  const tried = ['sp','ip','ci','suspects','insurgents','informants'];
-  const addedUrls = new Set();
-  for (const p of tried) {
-    const files = await fetchFilesFromPath(p);
-    if (!files || files.length === 0) continue;
-    const group = document.createElement('optgroup');
-    group.label = p;
-    files.forEach(f => {
-      if (addedUrls.has(f.url)) return;
-      addedUrls.add(f.url);
-      const opt = document.createElement("option");
-      opt.value = f.url;
-      opt.textContent = f.name || fileNameFromUrl(f.url);
-      // mark selected if in preselected
-      if (Array.isArray(preselected) && preselected.some(s => (s.url || s) === f.url)) opt.selected = true;
-      group.appendChild(opt);
-    });
-    sel.appendChild(group);
-  }
-  // also include any preselected items that weren't found in DB (so we don't lose them)
-  (preselected || []).forEach(p => {
-    const url = p.url || p;
-    if (!url) return;
-    if (addedUrls.has(url)) return;
-    const opt = document.createElement("option");
-    opt.value = url;
-    opt.textContent = p.name || fileNameFromUrl(url);
-    opt.selected = true;
-    sel.appendChild(opt);
-  });
-
-  // update visible relatedList (for quick links)
-  updateRelatedListFromSelect();
-}
-function updateRelatedListFromSelect() {
-  const sel = document.getElementById("fRelatedSelect");
-  const arr = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
-  renderFileList("relatedList", arr);
-}
-
 /* ---------- Edge drawing & anchor positioning ---------- */
-/* Return anchor center in WORLD coordinates.
-   We compute using the model world coords (card.x/card.y) plus the anchor element's offset within the card.
-   This avoids visual de-sync when CSS transforms (zoom/pan) are applied to the viewport.
-*/
+/* anchorCenter returns the center of the .anchor element in WORLD coordinates */
 function anchorCenter(cardId) {
-  const cardModel = cards.find(c => c.id === cardId);
   const cardEl = document.getElementById(cardId);
-  if (!cardModel || !cardEl) return null;
+  if (!cardEl) return null;
+  // find anchor element inside card
   const anchorEl = cardEl.querySelector('.anchor');
   if (!anchorEl) return null;
-  // offsetLeft/offsetTop are relative to cardEl (position:relative) and in CSS px -> same world units as card.x/y
-  const ax_world = cardModel.x + anchorEl.offsetLeft + anchorEl.offsetWidth / 2;
-  const ay_world = cardModel.y + anchorEl.offsetTop + anchorEl.offsetHeight / 2;
-  return { x: ax_world, y: ay_world };
+  const rectAnchor = anchorEl.getBoundingClientRect();
+  const rectViewport = viewport.getBoundingClientRect();
+  // center of anchor in screen coords relative to viewport top-left
+  const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
+  const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
+  // convert screen px to world coords (same mapping used throughout)
+  return { x: (ax - tx) / scale, y: (ay - ty) / scale };
 }
 
 function updateEdges() {
@@ -461,7 +292,7 @@ function updateEdges() {
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
     line.setAttribute("y2", posB.y);
-    line.setAttribute("stroke", "#ffffff"); // solid white
+    line.setAttribute("stroke", "#ffffff");
     line.setAttribute("stroke-width", "4");
     line.setAttribute("stroke-linecap", "round");
     line.setAttribute("opacity", "0.95");
@@ -672,7 +503,7 @@ function loadState(state) {
   ty = state.ty || 0;
   scale = state.scale || 1;
   applyTransform();
-  render();   // re-render DOM after restoring state
+  render();   // ensure DOM reflects restored state
 }
 
 function undo() {
@@ -681,7 +512,7 @@ function undo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     redoStack.push(current);
     const prev = undoStack.pop();
-    loadState(prev);   // loadState already calls render()
+    if (prev) loadState(prev);
     toast("Undo");
   } catch (e) { console.error(e); }
 }
@@ -692,117 +523,88 @@ function redo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(current);
     const nxt = redoStack.pop();
-    loadState(nxt);  // loadState now does render()
+    if (nxt) loadState(nxt);
     toast("Redo");
   } catch (e) { console.error(e); }
 }
 
 /* ---------- Selection / Editor ---------- */
 function deselect() {
-  if (selected) {
+  if(selected){
     let el = document.getElementById(selected);
-    if (el) el.classList.remove("selected");
-    selected = null; 
-    selectedType = null;
+    if(el) el.classList.remove("selected");
+    selected = null; selectedType = null;
   }
   closeEditor();
 }
+function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-function closeEditor() { 
-  document.getElementById("editor").style.display = "none"; 
-}
-
-/*
-  Single openEditor implementation — async so it can await related-files population.
-  Behavior:
-  - When type === "card": show full editor and populate fields + related select (from DB).
-  - When type === "textbox": show only the description textarea.
-*/
-async function openEditor(id, type) {
-  let ed = document.getElementById("editor");
-  ed.style.display = "block";
-
-  // Reset all fields quickly
-  document.getElementById("fImage").value = "";
-  document.getElementById("fName").value = "";
-  fillBranchSelect("None");
-  fillRankSelect("None", "None");
-  document.getElementById("fSubbranch").value = "";
-  document.getElementById("fStatus").value = "Unknown";
-  document.getElementById("fDesc").value = "";
-  document.getElementById("otherList").innerHTML = "(none)";
-  document.getElementById("fOtherUrl").value = "";
-  document.getElementById("fOtherName").value = "";
-
-  selected = id;
-  selectedType = type;
-
-  if (type === "card") {
-    // show full editor
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
-    const card = cards.find(c => c.id === id);
-    if (!card) return;
-    // populate related select from DB — pass the current card relatedFiles so selections are marked
-    await fillRelatedSelect(card.data.relatedFiles || []);
-    // also show list of selected related links
-    updateRelatedListFromSelect();
-
-    // populate rest of values
-    document.getElementById("fImage").value = card.data.image || "";
-    document.getElementById("fName").value = card.data.name || "";
-    fillBranchSelect(card.data.branch);
-    fillRankSelect(card.data.branch, card.data.rank);
-    document.getElementById("fSubbranch").value = card.data.subbranch || "";
-    document.getElementById("fStatus").value = card.data.status || "Unknown";
-    document.getElementById("fDesc").value = card.data.desc || "";
-    renderFileList("otherList", card.data.otherFiles);
-  } else {
-    // textbox type: hide all except header + description
-    document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
-    document.querySelector("#editor header").style.display = "block";
-
-    const descLabel = Array.from(document.querySelectorAll("#editor label"))
-      .find(l => l.textContent.includes("Short Description"));
-    if (descLabel) descLabel.style.display = "block";
-
-    document.getElementById("fDesc").style.display = "block";
-
-    const box = textBoxes.find(t => t.id === id);
-    if (box) document.getElementById("fDesc").value = box.content || "";
-  }
-}
-
+/* Populate branch and rank selects */
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
-  Object.keys(branchColors).forEach(b => {
+  Object.keys(branchColors).forEach(b=>{
     const opt = document.createElement("option");
     opt.value = b; opt.textContent = b;
-    if (b === selectedBranch) opt.selected = true;
+    if(b === selectedBranch) opt.selected = true;
     sel.appendChild(opt);
   });
 }
-function fillRankSelect(branch, selectedRank) {
+function fillRankSelect(branch, selectedRank){
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
-  (rankLists[branch] || ['None']).forEach(r => {
+  (rankLists[branch] || ['None']).forEach(r=>{
     const opt = document.createElement("option");
     opt.value = r; opt.textContent = r;
-    if (r === selectedRank) opt.selected = true;
+    if(r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
 }
-function renderFileList(containerId, files) {
+
+/* Fill a select with related files from DB paths: suspects, insurgents, informants */
+async function fillRelatedSelect(selected = []) {
+  const sel = document.getElementById("fRelatedSelect");
+  sel.innerHTML = "";
+  // we assume DB layout: /suspects, /insurgents, /informants each contains entries with { url, name }
+  const paths = ['suspects','insurgents','informants'];
+  for (const p of paths) {
+    try {
+      const snapshot = await db.ref(p).once('value');
+      const val = snapshot.val();
+      if (!val) continue;
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = p;
+      Object.keys(val).forEach(k=>{
+        const file = val[k];
+        // require file.url
+        if (!file || !file.url) return;
+        const opt = document.createElement('option');
+        opt.value = file.url;
+        opt.textContent = file.name || file.url;
+        // mark selected if in selected array
+        if ((selected || []).some(s => s.url === file.url || s === file.url)) opt.selected = true;
+        optgroup.appendChild(opt);
+      });
+      sel.appendChild(optgroup);
+    } catch (e) {
+      // ignore individual path errors, continue
+      console.warn("Failed to load", p, e);
+    }
+  }
+}
+
+/* Render 'other' and 'related' file lists (small helper) */
+function renderFileList(containerId, files){
   const cont = document.getElementById(containerId);
   cont.innerHTML = "";
-  if (!files || files.length === 0) {
+  if(!files || files.length === 0){
     cont.textContent = "(none)";
     return;
   }
   const ul = document.createElement('ul');
   ul.style.margin = '6px 0 0 0';
   ul.style.paddingLeft = '18px';
-  files.forEach(f => {
+  files.forEach(f=>{
     const li = document.createElement('li');
     const a = document.createElement("a");
     a.href = f.url || f;
@@ -814,12 +616,63 @@ function renderFileList(containerId, files) {
   cont.appendChild(ul);
 }
 
-/* ---------- Editor: button handlers ---------- */
+/* Open editor — async because we fill related select from Firebase */
+async function openEditor(id, type){
+  let ed = document.getElementById("editor");
+  ed.style.display = "block";
+  // Reset fields
+  document.getElementById("fImage").value = "";
+  document.getElementById("fName").value = "";
+  fillBranchSelect("None");
+  fillRankSelect("None", "None");
+  document.getElementById("fSubbranch").value = "";
+  document.getElementById("fStatus").value = "Unknown";
+  document.getElementById("fDesc").value = "";
+  document.getElementById("otherList").innerHTML = "(none)";
+  document.getElementById("fOtherUrl").value = "";
+  document.getElementById("fOtherName").value = "";
+
+  const card = (type === "card") ? cards.find(c => c.id === id) : null;
+
+  // populate related select from DB and pre-select any existing relatedFiles
+  try {
+    await fillRelatedSelect(card ? card.data.relatedFiles : []);
+  } catch (e) { console.warn("fillRelatedSelect failed", e); }
+
+  selected = id; selectedType = type;
+
+  if(type === "card" && card){
+    // show all editor controls
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
+    document.getElementById("fImage").value = card.data.image || "";
+    document.getElementById("fName").value = card.data.name || "";
+    fillBranchSelect(card.data.branch);
+    fillRankSelect(card.data.branch, card.data.rank);
+    document.getElementById("fSubbranch").value = card.data.subbranch || "";
+    document.getElementById("fStatus").value = card.data.status || "Unknown";
+    document.getElementById("fDesc").value = card.data.desc || "";
+    renderFileList("relatedList", card.data.relatedFiles);
+    renderFileList("otherList", card.data.otherFiles);
+  } else if(type === "textbox"){
+    // show only description in editor for textboxes
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
+    document.querySelector("#editor header").style.display = "block";
+    const descLabel = Array.from(document.querySelectorAll("#editor label"))
+      .find(l => l.textContent.includes("Short Description"));
+    if (descLabel) descLabel.style.display = "block";
+    document.getElementById("fDesc").style.display = "block";
+    const box = textBoxes.find(t => t.id === id);
+    if (box) document.getElementById("fDesc").value = box.content || "";
+  }
+}
+
+/* ---------- Editor actions ---------- */
+/* Add other file by URL (keeps database free) */
 document.getElementById("btnAddOther").onclick = ()=>{
-  if(!selected || selectedType !== 'card') { toast("No card selected"); return; }
+  if(!selected || selectedType !== 'card') return alert("No card selected");
   const url = document.getElementById("fOtherUrl").value.trim();
   const name = document.getElementById("fOtherName").value.trim() || fileNameFromUrl(url);
-  if(!url) { alert("Please enter a URL"); return; }
+  if(!url) return alert("Please enter a URL");
   const card = cards.find(c=>c.id === selected);
   if(!card) return;
   card.data.otherFiles = card.data.otherFiles || [];
@@ -830,11 +683,8 @@ document.getElementById("btnAddOther").onclick = ()=>{
   snapshot();
 };
 
-// when user changes selection in related select, update the small list preview
-document.getElementById("fRelatedSelect").addEventListener('change', updateRelatedListFromSelect);
-
-// Save/cancel in editor
-document.getElementById("btnSave").onclick = ()=>{
+/* Save in editor */
+document.getElementById("btnSave").onclick = async ()=>{
   if(!selected) return;
   if(selectedType === 'card'){
     const card = cards.find(c=>c.id === selected);
@@ -847,9 +697,10 @@ document.getElementById("btnSave").onclick = ()=>{
     card.data.status = document.getElementById("fStatus").value;
     card.data.desc = document.getElementById("fDesc").value.trim();
     card.data.branchColor = branchColors[card.data.branch] || "#777";
-    // related files: read from select
+    // Save selected related files from the select element
     const sel = document.getElementById("fRelatedSelect");
-    card.data.relatedFiles = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
+    const selectedOptions = Array.from(sel.selectedOptions).map(o => ({ url: o.value, name: o.textContent }));
+    card.data.relatedFiles = selectedOptions;
     // Re-render card
     const oldEl = document.getElementById(card.id);
     if(oldEl) oldEl.remove();
@@ -918,19 +769,17 @@ document.getElementById("deleteSelectedBtn").onclick = async function(){
   if(!selected) { toast("Select a card or textbox first"); return; }
   const confirmed = await customConfirm("Delete selected item?");
   if(!confirmed) return;
-
   if(selectedType === "card"){
     cards.splice(cards.findIndex(c => c.id === selected), 1);
+    // Remove edges connected to this card
     edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
   } else if(selectedType === "textbox"){
     textBoxes.splice(textBoxes.findIndex(t => t.id === selected), 1);
   }
   const el = document.getElementById(selected);
   if(el) el.remove();
-  selected = null; selectedType = null;
-  closeEditor(); render(); snapshot();
+  selected = null; selectedType = null; closeEditor(); render(); snapshot();
 };
-
 document.getElementById("undoBtn").onclick = undo;
 document.getElementById("redoBtn").onclick = redo;
 
@@ -946,17 +795,14 @@ stage.addEventListener("dblclick", e=>{
   makeCardView(newCard); snapshot(); render(); openEditor(newCard.id, 'card');
 });
 
-// Search filtering + focus single-match
+// Search filtering
 document.getElementById("searchBox").oninput = function(){
   const query = this.value.toLowerCase();
-  let matches = [];
   cards.forEach(card=>{
     const el = document.getElementById(card.id);
     if(!el) return;
     const text = `${card.data.name} ${card.data.branch} ${card.data.rank}`.toLowerCase();
-    const shown = !query || text.includes(query);
-    el.style.display = shown ? "flex" : "none";
-    if (shown && query && text.includes(query)) matches.push(card);
+    el.style.display = !query || text.includes(query) ? "flex" : "none";
   });
   textBoxes.forEach(box=>{
     const el = document.getElementById(box.id);
@@ -964,37 +810,13 @@ document.getElementById("searchBox").oninput = function(){
     const text = (box.content || "").toLowerCase();
     el.style.display = !query || text.includes(query) ? "block" : "none";
   });
-
-  // If exactly one match, focus it
-  if (matches.length === 1) {
-    focusCard(matches[0]);
-  }
 };
 
-function focusCard(card){
-  const el = document.getElementById(card.id);
-  if(!el) return;
-  // center card in viewport
-  const rect = stage.getBoundingClientRect();
-  const cardCenterX = card.x + 180; // half of 360 width
-  const cardCenterY = card.y + 90;  // approx mid-height of card (top + 90)
-  tx = rect.width / 2 - cardCenterX * scale;
-  ty = rect.height / 2 - cardCenterY * scale;
-  applyTransform();
-  updateEdges();
-
-  // flash highlight
-  el.classList.remove('flash-highlight');
-  void el.offsetWidth;
-  el.classList.add('flash-highlight');
-}
-
-/* ---------- Zoom ---------- */
+// Zoom
 stage.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = 1.1;
   const mousePos = clientToWorld(e.clientX, e.clientY);
-  const oldScale = scale;
   scale = (e.deltaY < 0) ? scale * zoomFactor : scale / zoomFactor;
   scale = Math.min(Math.max(scale, 0.25), 4);
   tx = e.clientX - mousePos.x * scale;
@@ -1043,18 +865,17 @@ stage.addEventListener('pointercancel', e => {
 
 /* ---------- Anchor linking (create edges) ---------- */
 let anchorDrag = { active:false, startCardId:null, tmpLine:null };
-
 stage.addEventListener('pointerdown', e => {
+  // Start anchor drag when user presses on an anchor
   if (e.target.classList.contains('anchor')) {
     const cardEl = e.target.closest('.card');
     if (!cardEl) return;
-
     anchorDrag.active = true;
     anchorDrag.startCardId = cardEl.id;
 
     const svgNS = "http://www.w3.org/2000/svg";
     anchorDrag.tmpLine = document.createElementNS(svgNS, 'line');
-    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff'); // white line
+    anchorDrag.tmpLine.setAttribute('stroke', '#ffffff');
     anchorDrag.tmpLine.setAttribute('stroke-width', '3');
     anchorDrag.tmpLine.setAttribute('stroke-linecap', 'round');
     wiresLayer.appendChild(anchorDrag.tmpLine);
@@ -1066,7 +887,6 @@ stage.addEventListener('pointerdown', e => {
       anchorDrag.tmpLine.setAttribute('x2', startPos.x);
       anchorDrag.tmpLine.setAttribute('y2', startPos.y);
     }
-
     try { e.target.setPointerCapture(e.pointerId); } catch {}
   }
 });
@@ -1074,13 +894,15 @@ stage.addEventListener('pointerdown', e => {
 stage.addEventListener('pointermove', e => {
   if (!anchorDrag.active) return;
   const pos = clientToWorld(e.clientX, e.clientY);
-
-  const startPos = anchorCenter(anchorDrag.startCardId);
-  if (anchorDrag.tmpLine && startPos) {
-    anchorDrag.tmpLine.setAttribute('x1', startPos.x);
-    anchorDrag.tmpLine.setAttribute('y1', startPos.y);
-    anchorDrag.tmpLine.setAttribute('x2', pos.x);
-    anchorDrag.tmpLine.setAttribute('y2', pos.y);
+  if (anchorDrag.tmpLine) {
+    // keep x1,y1 synced with model start (in case the start card moves)
+    const startPos = anchorCenter(anchorDrag.startCardId);
+    if (startPos) {
+      anchorDrag.tmpLine.setAttribute('x1', startPos.x);
+      anchorDrag.tmpLine.setAttribute('y1', startPos.y);
+      anchorDrag.tmpLine.setAttribute('x2', pos.x);
+      anchorDrag.tmpLine.setAttribute('y2', pos.y);
+    }
   }
 });
 
@@ -1090,9 +912,9 @@ stage.addEventListener('pointerup', e => {
 
   let targetCard = null;
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  if (el) {
+  if(el) {
     const cardEl = el.closest('.card');
-    if (cardEl) targetCard = cardEl.id;
+    if(cardEl) targetCard = cardEl.id;
   }
 
   if (!targetCard || targetCard === anchorDrag.startCardId) {
@@ -1126,7 +948,6 @@ stage.addEventListener('pointerup', e => {
   }
   try { e.target.releasePointerCapture(e.pointerId); } catch {}
 });
-
 
 /* ---------- Deselect on stage click ---------- */
 stage.addEventListener("click", e=>{
@@ -1245,13 +1066,6 @@ document.addEventListener("click", (e) => {
   if (e.target.closest('#toolbar') || e.target.closest('#editor')) return;
 }, false);
 
-// Initialize
-document.addEventListener("DOMContentLoaded", ()=>{
-  refreshWebList();
-  render();
-  // initial snapshot
-  snapshot();
-});
 function customConfirm(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById("confirmModal");
@@ -1272,6 +1086,14 @@ function customConfirm(message) {
     noBtn.onclick = () => { cleanup(); resolve(false); };
   });
 }
+
+// Initialize
+document.addEventListener("DOMContentLoaded", ()=>{
+  refreshWebList();
+  render();
+  // initial snapshot
+  snapshot();
+});
 
 // Keyboard shortcuts: Ctrl+Z / Ctrl+Y
 document.addEventListener('keydown', (e) => {
