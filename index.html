@@ -41,18 +41,19 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   transition: box-shadow 0.15s;
 }
 
-.card { 
-  width:360px;
-  background:#222;
-  color:#e0e0e0;
-  border-radius:10px;
-  padding:15px 18px;
-  display:flex;
-  align-items:flex-start;
-  gap:12px;
-  overflow:visible;   /* ✅ lets the anchor render above */
-  position: relative; /* ✅ ensures .anchor positions relative to card */
+.card {
+  position: relative;  /* ✅ required so .anchor can position itself */
+  width: 360px;
+  background: #222;
+  color: #e0e0e0;
+  border-radius: 10px;
+  padding: 15px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow: visible;   /* ✅ so anchor isn't clipped */
 }
+
 
 
 
@@ -150,7 +151,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #000000;
-  top: -8px;                    /* ⬅️ moves it above the card edge */
+  top: -10px;                  /* 👈 now this will actually move it */
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
