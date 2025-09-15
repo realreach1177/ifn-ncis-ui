@@ -373,20 +373,21 @@ function anchorCenter(cardId) {
   const anchorEl = cardEl.querySelector('.anchor');
   if (!anchorEl) return null;
 
-  // get its bounding box
+  // bounding boxes
   const rectAnchor = anchorEl.getBoundingClientRect();
   const rectViewport = viewport.getBoundingClientRect();
 
-  // calculate the dot center in screen space
+  // center of the anchor dot (in screen coords)
   const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
   const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
 
-  // convert screen px → world coords
+  // convert to world coords
   return {
     x: (ax - tx) / scale,
     y: (ay - ty) / scale
   };
 }
+
 
 
 function updateEdges() {
