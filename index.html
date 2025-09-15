@@ -150,12 +150,13 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
   border-radius: 50%;
   background: #ffffff;
   border: 2px solid #000000;
-  top: 0;
+  top: 12px;                     /* 👈 lower inside the card */
   left: 50%;
-  transform: translate(-50%, -150%);
+  transform: translate(-50%, 0); /* 👈 only center horizontally */
   z-index: 9999;
   cursor: crosshair;
 }
+
 
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
