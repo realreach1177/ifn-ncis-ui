@@ -1,127 +1,135 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Connection Web — Full (Attachments, Minimap, Save/Load)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Connection Web — Full (Preserved + Enhancements)</title>
 
-<!-- Firebase compat -->
-<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
+<!-- Firebase (compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
 <style>
 :root{
-  --bg:#0e1113; --panel:#1b2228; --muted:#99aacc; --accent:#66aaff;
+  --bg:#0f1113; --panel:#1c1c1c; --muted:#99aacc; --accent:#66aaff;
 }
-html,body{height:100%;margin:0;background:var(--bg);color:#e6eef6;font-family:Segoe UI, Roboto, system-ui, -apple-system;overflow:hidden;}
-/* Stage */
-#stage{position:absolute;inset:0;background:linear-gradient(180deg,#0c0e11, #0f1214);cursor:grab;overflow:hidden;}
-#viewport{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;overflow:visible;}
-/* wires (SVG) and card layer */
-#wires{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;}
-#cards{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2;pointer-events:auto;}
-/* Toolbar split */
-#toolbar{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:94%;max-width:1200px;background:var(--panel);padding:10px 12px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;z-index:5000;box-shadow:0 10px 30px rgba(0,0,0,0.6);}
-.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:8px;}
-.toolbar-left button,.toolbar-right button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;background:#2f3941;}
-#addProfileBtn{background:#3949ab;} #addTextBtn{background:#6a1b9a;} #deleteSelectedBtn{background:#7b3d3d;} #undoBtn,#redoBtn{background:#455a64;}
-#searchBox{background:#222;border-radius:8px;padding:8px 10px;color:#dfefff;border:none;min-width:200px;}
-#webNameInput,#webListDropdown{background:#222;border-radius:8px;padding:8px 10px;color:#dfefff;border:none;}
-#saveWebBtn{background:#2e7d32;} #loadWebBtn{background:#1565c0;} #deleteWebBtn{background:#c62828;}
-/* card */
-.card{position:absolute;background:#202126;border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6);color:#eaf6ff;cursor:grab;min-width:320px;display:flex;gap:12px;align-items:flex-start;z-index:10;user-select:text;}
-.card.textNode{min-width:auto;padding:8px 12px;background:transparent;color:#77aaff;font-weight:700;cursor:grab;box-shadow:none;}
-.card .img{width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.06);}
-.card .info{flex:1;min-width:0;}
-.card .name{font-size:18px;font-weight:800;color:var(--accent);margin-bottom:4px;word-break:break-word;}
-.card .rank{font-weight:700;color:#cfe6ff;margin-bottom:6px;}
-.card .faction{display:inline-block;padding:6px 10px;border-radius:8px;background:#233a54;color:#dff1ff;font-weight:700;margin-bottom:8px;}
-.card .status{display:flex;align-items:center;gap:8px;font-weight:700;color:#cfe6ff;}
-.card .desc{margin-top:8px;color:#9fbfdc;font-size:13px;white-space:pre-wrap;word-break:break-word;}
-.file-list{margin-top:8px;padding-left:18px;color:#8fbfe0;font-size:13px;max-height:120px;overflow:auto;}
-.file-list a{color:#74b9ff;text-decoration:none;}
-.anchor{position:absolute;width:14px;height:14px;border-radius:50%;background:#ffd54f;border:2px solid #222;top:-8px;left:50%;transform:translate(-50%,-50%);cursor:crosshair;box-shadow:0 1px 6px rgba(0,0,0,0.5);}
-/* editor panel */
-#editor{position:fixed;right:12px;top:72px;width:380px;background:var(--panel);padding:16px;border-radius:12px;z-index:6000;box-shadow:-6px 12px 30px rgba(0,0,0,0.6);display:none;}
-#editor h3{margin:0 0 8px 0;color:var(--accent);font-size:18px;}
-#editor label{display:block;margin-top:8px;font-size:13px;color:#c7dfea;}
-#editor input,#editor select,#editor textarea{width:100%;padding:8px;border-radius:8px;border:none;background:#15232b;color:#e6f6ff;margin-top:6px;font-weight:600;}
-#editor textarea{min-height:80px;}
-#editor .btns{display:flex;gap:8px;margin-top:12px;}
-#editor .btns button{flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:800;color:#fff;}
-#editor .save{background:#2e7d32;} #editor .cancel{background:#8a4b4b;}
-/* minimap */
-#minimap{position:fixed;right:18px;bottom:18px;width:220px;height:150px;background:#071017;border-radius:10px;border:1px solid #14242b;z-index:7000;box-shadow:0 8px 30px rgba(0,0,0,0.6);overflow:hidden;}
-#minimapSVG{width:100%;height:100%;background:transparent;}
-/* misc */
-.selected{outline:3px solid rgba(255,200,40,0.2);box-shadow:0 0 20px rgba(255,200,40,0.08);}
+html,body{height:100%;margin:0;background:var(--bg);color:#e6eef6;font-family: "Segoe UI", Roboto, system-ui, -apple-system;overflow:hidden;}
+/* Toolbar */
+#toolbar{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:92%;max-width:1200px;background:var(--panel);padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;z-index:1200;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+.toolbar-left,.toolbar-right{display:flex;align-items:center;gap:8px}
+.toolbar-left button,.toolbar-right button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700;color:#fff;background:#2f3941}
+#addProfileBtn{background:#3949ab}
+#addTextBtn{background:#6a1b9a}
+#deleteSelectedBtn{background:#7b3d3d}
+#undoBtn,#redoBtn{background:#455a64}
+#searchBox{background:#23282d;border-radius:8px;padding:8px 10px;color:#cfe6ff;border:none;min-width:180px}
+
+/* right group */
+#webNameInput,#webListDropdown{background:#21272b;border-radius:8px;padding:8px 10px;color:#dfefff;border:none}
+#saveWebBtn{background:#2e7d32}
+#loadWebBtn{background:#1565c0}
+#deleteWebBtn{background:#c62828}
+
+/* Stage & viewport */
+#stage{position:absolute;inset:0;cursor:grab;background:
+  linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size:40px 40px}
+#viewport{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;overflow:visible}
+svg#wires{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1}
+#cards{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2}
+
+/* Card */
+.card{position:absolute;background:#202126;border-radius:12px;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,0.6);color:#eaf6ff;cursor:grab;min-width:300px;display:flex;gap:12px;align-items:flex-start;z-index:10}
+.card.textNode{min-width:auto;background:transparent;color:#77aaff;font-weight:700;padding:6px 12px;box-shadow:none}
+.card .img{width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.06)}
+.card .info{flex:1}
+.card .name{font-size:18px;font-weight:800;color:var(--accent);margin-bottom:4px}
+.card .rank{font-weight:700;color:#cfe6ff;margin-bottom:6px}
+.card .faction{display:inline-block;padding:6px 10px;border-radius:8px;background:#233a54;color:#dff1ff;font-weight:700;margin-bottom:8px}
+.card .desc{margin-top:8px;color:#9fbfdc;font-size:13px}
+.file-list{margin-top:8px;padding-left:18px;color:#8fbfe0;font-size:13px;max-height:90px;overflow:auto}
+.anchor{position:absolute;width:14px;height:14px;border-radius:50%;background:#ffd54f;border:2px solid #222;top:-8px;left:50%;transform:translate(-50%,-50%);cursor:crosshair;box-shadow:0 1px 6px rgba(0,0,0,0.5)}
+
+/* Editor */
+#editPanel{position:fixed;right:16px;top:72px;width:380px;background:var(--panel);padding:18px;border-radius:12px;z-index:1500;display:none;box-shadow:-8px 16px 40px rgba(0,0,0,0.6)}
+#editPanel h3{margin:0 0 10px 0;color:var(--accent);font-size:18px}
+#editPanel label{display:block;margin-top:10px;font-weight:700;color:#cfe6ff}
+#editPanel input,#editPanel select,#editPanel textarea{width:100%;padding:8px;border-radius:8px;border:none;background:#1b2430;color:#e6f6ff;margin-top:6px}
+#editPanel textarea{min-height:80px}
+#editPanel .btns{display:flex;gap:8px;margin-top:12px}
+#editPanel button{flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-weight:800;color:#fff}
+#editPanel .save{background:#2e7d32}#editPanel .cancel{background:#8a4b4b}
+
+/* Minimap */
+#minimap{position:fixed;right:18px;bottom:18px;width:240px;height:160px;background:#0f1315;border-radius:10px;border:1px solid #1f2a33;z-index:1400;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+#minimapSVG{width:100%;height:100%}
+
+/* small helpers */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:#0b1220;padding:10px 18px;border-radius:8px;color:#fff;z-index:999999;box-shadow:0 6px 20px rgba(0,0,0,0.7)}
+.selected{outline:3px solid rgba(255,200,40,0.25);box-shadow:0 0 20px rgba(255,200,40,0.12)}
 .dragging{box-shadow:0 0 26px 4px rgba(102,170,255,0.12)}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:#071022;padding:10px 16px;border-radius:8px;color:#fff;z-index:99999;box-shadow:0 6px 20px rgba(0,0,0,0.7);}
 </style>
 </head>
 <body>
-  <!-- Toolbar -->
-  <div id="toolbar" role="toolbar" aria-label="Main controls">
-    <div class="toolbar-left" role="group" aria-label="Node tools">
-      <button id="addProfileBtn" title="Add Profile">Add Profile</button>
-      <button id="addTextBtn" title="Add Text Label">Add Text</button>
-      <button id="deleteSelectedBtn" title="Delete selected">Delete Selected</button>
-      <button id="undoBtn" title="Undo (Ctrl/Cmd+Z)">Undo</button>
-      <button id="redoBtn" title="Redo (Ctrl/Cmd+Y)">Redo</button>
-      <input id="searchBox" type="text" placeholder="Search name, branch, rank..." aria-label="Search"/>
-    </div>
-    <div class="toolbar-right" role="group" aria-label="Workspace controls">
-      <input id="webNameInput" type="text" placeholder="Connection Web name" aria-label="Workspace name"/>
-      <select id="webListDropdown" aria-label="Saved webs"></select>
-      <button id="saveWebBtn">Save</button>
-      <button id="loadWebBtn">Load</button>
-      <button id="deleteWebBtn">Delete</button>
-    </div>
+
+<div id="toolbar" role="toolbar" aria-label="Main controls">
+  <div class="toolbar-left" role="group">
+    <button id="addProfileBtn" title="Add Profile (double-click stage too)">Add Profile</button>
+    <button id="addTextBtn" title="Add Text Label">Add Text</button>
+    <button id="deleteSelectedBtn" title="Delete selected card/textbox">Delete Selected</button>
+    <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+    <button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+    <input id="searchBox" type="text" placeholder="Search name, branch, rank..." aria-label="Search"/>
   </div>
 
-  <!-- Stage -->
-  <div id="stage">
-    <div id="viewport">
-      <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
-      <div id="cards"></div>
-    </div>
+  <div class="toolbar-right" role="group" aria-label="Workspace controls">
+    <input id="webNameInput" type="text" placeholder="Connection Web name" aria-label="Workspace name"/>
+    <select id="webListDropdown" aria-label="Saved webs"></select>
+    <button id="saveWebBtn">Save</button>
+    <button id="loadWebBtn">Load</button>
+    <button id="deleteWebBtn">Delete</button>
   </div>
+</div>
 
-  <!-- Editor -->
-  <div id="editor" role="dialog" aria-modal="true" aria-hidden="true">
-    <h3>Edit Profile</h3>
-    <label>Image URL</label><input id="fImage" type="url" placeholder="https://..."/>
-    <label>Name</label><input id="fName" type="text" />
-    <label>Status</label><select id="fStatus"><option>Unknown</option><option>Alive</option><option>Dead</option></select>
-    <label>Branch</label><select id="fBranch"></select>
-    <label>Subbranch</label><input id="fSubbranch" type="text" />
-    <label>Rank</label><select id="fRank"></select>
-    <label>Description</label><textarea id="fDesc"></textarea>
-
-    <label>Attached Files (from DB)</label>
-    <select id="selectFiles" multiple size="6" style="width:100%;margin-top:6px;background:#0f1b26;color:#dff1ff;border-radius:6px;padding:6px;"></select>
-
-    <label>External file URL (add)</label><input id="inputExternalFile" type="url" placeholder="https://..."/>
-    <label>External file display name</label><input id="inputExternalName" type="text" placeholder="Optional display name"/>
-
-    <label style="margin-top:10px;"><input id="checkboxSnap" type="checkbox" /> Enable snapping for this node</label>
-
-    <div id="relatedList" style="margin-top:10px;color:#88aacc;font-size:13px;max-height:120px;overflow:auto;">(no attachments)</div>
-
-    <div class="btns">
-      <button class="save" id="btnSave">Save</button>
-      <button class="cancel" id="btnCancel">Cancel</button>
-    </div>
+<div id="stage">
+  <div id="viewport">
+    <svg id="wires" xmlns="http://www.w3.org/2000/svg" overflow="visible"></svg>
+    <div id="cards"></div>
   </div>
+</div>
 
-  <!-- Minimap -->
-  <div id="minimap"><svg id="minimapSVG" xmlns="http://www.w3.org/2000/svg"></svg></div>
+<div id="editPanel" role="dialog" aria-modal="true" aria-hidden="true">
+  <h3>Edit Profile</h3>
+  <label>Image URL</label><input id="fImage" type="url" placeholder="https://..."/>
+  <label>Name</label><input id="fName" type="text" />
+  <label>Status</label><select id="fStatus"><option>Unknown</option><option>Alive</option><option>Dead</option></select>
+  <label>Faction</label><select id="fFaction"></select>
+  <label>Sub-branch</label><input id="fSubbranch" type="text" />
+  <label>Rank</label><select id="fRank"></select>
+  <label>Details</label><textarea id="fDesc"></textarea>
+
+  <label>Attached files (from DB)</label>
+  <select id="selectFiles" multiple size="6" style="width:100%;margin-top:6px;background:#0f1b26;color:#dff1ff;border-radius:6px;padding:6px;"></select>
+
+  <label>External file URL (add)</label><input id="fExternalUrl" type="url" placeholder="https://..." />
+  <label>External file display name</label><input id="fExternalName" type="text" placeholder="Optional display name" />
+
+  <label style="margin-top:10px;"><input id="fEnableSnap" type="checkbox" /> Enable snapping for this node</label>
+
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    <button id="btnSavePanel" class="save">Save</button>
+    <button id="btnCancelPanel" class="cancel">Cancel</button>
+  </div>
+</div>
+
+<div id="minimap"><svg id="minimapSVG" xmlns="http://www.w3.org/2000/svg"></svg></div>
 
 <script>
-/* =============================
-   Firebase config
-   ============================= */
+/* ======================
+   Firebase Initialization
+   ====================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCIPvPH1loTbzY9MZN6XAoRG7PmUpU4J2I",
   authDomain: "ncis-intranet.firebaseapp.com",
@@ -135,21 +143,19 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
-auth.signInAnonymously().catch(console.error);
+auth.signInAnonymously().catch(()=>{});
 
-/* =============================
-   App state & DOM refs
-   ============================= */
-let cards = [];      // {id,x,y,data:{...}}
-let textBoxes = [];  // {id,x,y,content,width}
-let edges = [];      // {id,a:{card}, b:{card}}
-let selected = null; // id
-let selectedType = null; // 'card'|'textbox'
+/* ======================
+   App State
+   ====================== */
+let cards = {};      // map id -> { id, x, y, data:{...}, isText }
+let edges = {};      // map id -> { id, source, target }
+let textBoxes = {};  // map id -> { id, x, y, content }
+let selectedId = null;
+let selectedType = null; // 'node'/'edge'/'text'
 let tx = 0, ty = 0, scale = 1;
 let undoStack = [], redoStack = [];
-let currentWebListener = null;
-let currentWeb = null;
-let globalSnapping = false;
+let autosave = false;
 
 const stage = document.getElementById('stage');
 const viewport = document.getElementById('viewport');
@@ -159,8 +165,11 @@ const minimapSVG = document.getElementById('minimapSVG');
 const webListDropdown = document.getElementById('webListDropdown');
 const webNameInput = document.getElementById('webNameInput');
 
-/* Branch colors & rank lists */
-const branchColors = {"None":"#777777","United States":"#3f51b5","Army":"#4caf50","Navy":"#2196f3","Marines":"#f44336","Air Force":"#03a9f4","Taliban":"#9c27b0","Al-Qaeda":"#ff9800"};
+/* Branch colors and rank lists (kept) */
+const factions = ["None","United States","Army","Navy","Marines","Air Force","Taliban","Al-Qaeda"];
+const factionColors = {
+  "None":"#777777","United States":"#3f51b5","Army":"#4caf50","Navy":"#2196f3","Marines":"#f44336","Air Force":"#03a9f4","Taliban":"#9c27b0","Al-Qaeda":"#ff9800"
+};
 const rankLists = {
   "None":["None"],
   "United States":["General","Colonel","Major","Captain","Lieutenant"],
@@ -172,343 +181,408 @@ const rankLists = {
   "Al-Qaeda":["Leader","Commander"]
 };
 
-/* =============================
+/* ======================
    Utilities
-   ============================= */
-function toast(msg, t=1400){
-  const el=document.createElement('div'); el.className='toast'; el.textContent=msg; document.body.appendChild(el);
-  setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, t);
-}
-function randId(prefix='i'){ return prefix + Math.random().toString(36).slice(2,9); }
-function fileNameFromUrl(url){ try{ return new URL(url).pathname.split('/').pop() || url; }catch{return url.split('/').pop()||url;} }
-function applyTransform(){ viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
-function clientToWorld(cx,cy){ const r = stage.getBoundingClientRect(); const sx = cx - r.left, sy = cy - r.top; return { x:(sx - tx)/scale, y:(sy - ty)/scale }; }
+   ====================== */
+function randId(prefix='id'){ return prefix + Math.random().toString(36).slice(2,10); }
+function toast(msg, t=1300){ const el = document.createElement('div'); el.className='toast'; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, t); }
+function fileNameFromUrl(url){ try{ return new URL(url).pathname.split('/').pop()||url }catch{ return (url||'').split('/').pop()||url } }
+function applyTransform(){ viewport.style.transform = `translate(${tx}px,${ty}px) scale(${scale})` }
 
-/* =============================
+/* convert client coordinates to world (viewport) coordinates */
+function clientToWorld(cx,cy){
+  const r = stage.getBoundingClientRect();
+  const sx = cx - r.left;
+  const sy = cy - r.top;
+  return { x: (sx - tx) / scale, y: (sy - ty) / scale };
+}
+
+/* ======================
    Rendering: cards, textboxes, edges
-   ============================= */
-function makeCardView(card){
+   ====================== */
+function createCardElement(node){
   const el = document.createElement('div');
-  el.className = 'card' + (card.isText ? ' textNode' : '');
-  el.id = card.id;
-  el.style.left = card.x + 'px';
-  el.style.top = card.y + 'px';
-  const d = card.data || {};
-  // if text node, render minimal
-  if(card.isText){
-    el.textContent = d.name || 'Text';
-    el.addEventListener('click', e=>{ e.stopPropagation(); selectElement(card.id,'card'); openEditor(card.id,'card'); });
-    // dragging
-    makeDraggableElement(el, card);
-    cardsLayer.appendChild(el);
-    return el;
+  el.className = 'card' + (node.isText ? ' textNode' : '');
+  el.id = 'card-' + node.id;
+  el.style.left = node.x + 'px';
+  el.style.top = node.y + 'px';
+  // content
+  if(node.isText){
+    el.innerHTML = `<div class="info"><div class="name">${node.data.name || 'Text'}</div></div>`;
+  } else {
+    const d = node.data || {};
+    el.innerHTML = `<img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" alt="avatar" />
+      <div class="info">
+        <div class="name" style="color:${d.branchColor || factionColors[d.faction] || '#66aaff'}">${d.name || 'New Profile'}</div>
+        <div class="rank">${d.rank || ''}</div>
+        <div class="faction">${d.faction || 'None'}${d.subBranch ? ' — ' + d.subBranch : ''}</div>
+        <div class="status"><span class="statusDot ${(d.status||'Unknown').toLowerCase()}"></span> ${d.status || 'Unknown'}</div>
+        <div class="description">${d.details || ''}</div>
+        <ul class="file-list">${(d.files || []).map(f=>`<li><a href="${f.url}" target="_blank" rel="noopener">${f.name||fileNameFromUrl(f.url)}</a></li>`).join('')}</ul>
+      </div>
+      <div class="anchor" title="Drag to link"></div>`;
   }
 
-  el.innerHTML = `
-    <img class="img" src="${d.image || 'https://i.ibb.co/zhKnjbh1/unknownperson.png'}" alt="avatar"/>
-    <div class="info">
-      <div class="name" style="color:${d.branchColor||'#66aaff'}">${d.name || 'Unnamed'}</div>
-      <div class="rank">${d.rank || ''}</div>
-      <div class="faction">${d.branch || 'None'}${d.subbranch ? ' — ' + d.subbranch : ''}</div>
-      <div class="status"><span class="dot ${(d.status||'Unknown').toLowerCase()}"></span> ${d.status||'Unknown'}</div>
-      <div class="desc">${d.desc || ''}</div>
-      <ul class="file-list">${(d.files||[]).map(f=>`<li><a href="${f.url}" target="_blank" rel="noopener">${f.name || fileNameFromUrl(f.url)}</a></li>`).join('')}</ul>
-    </div>
-    <div class="anchor" title="Drag to link"></div>
-  `;
+  // click selects and opens editor
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    selectNode(node.id);
+    if(!node.isText) openEditor(node.id);
+  });
 
-  el.addEventListener('click', e=>{ e.stopPropagation(); selectElement(card.id,'card'); openEditor(card.id,'card'); });
-  makeDraggableElement(el, card);
+  // dragging for card
+  let dragging = false, offset = {x:0,y:0};
+  el.addEventListener('pointerdown', e => {
+    if(e.target.classList.contains('anchor')) return; // anchor handled elsewhere
+    dragging = true; el.classList.add('dragging'); el.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - node.x; offset.y = wp.y - node.y;
+  });
+  el.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    node.x = wp.x - offset.x; node.y = wp.y - offset.y;
+    el.style.left = node.x + 'px'; el.style.top = node.y + 'px';
+    updateEdges();
+  });
+  el.addEventListener('pointerup', e => {
+    dragging = false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId); }catch{}
+    snapshot();
+  });
+  el.addEventListener('pointercancel', e => {
+    dragging = false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId); }catch{} snapshot();
+  });
 
   cardsLayer.appendChild(el);
   return el;
 }
 
-function makeDraggableElement(el, card){
-  let dragging=false, offset={x:0,y:0};
-  el.addEventListener('pointerdown', e=>{
-    if(e.target.classList.contains('anchor')) return;
-    dragging = true; el.classList.add('dragging'); el.setPointerCapture(e.pointerId);
-    const wp = clientToWorld(e.clientX, e.clientY);
-    offset.x = wp.x - card.x; offset.y = wp.y - card.y;
-  });
-  el.addEventListener('pointermove', e=>{
-    if(!dragging) return;
-    const wp = clientToWorld(e.clientX, e.clientY);
-    card.x = wp.x - offset.x; card.y = wp.y - offset.y;
-    el.style.left = card.x + 'px'; el.style.top = card.y + 'px';
-    updateEdges();
-  });
-  el.addEventListener('pointerup', e=>{
-    dragging = false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId);}catch{} snapshot(); 
-    // snapping on release if enabled
-    if(globalSnapping || (card.data && card.data.enableSnap)){
-      doSnapForCard(card);
-      const el2 = document.getElementById(card.id); if(el2){ el2.style.left = card.x + 'px'; el2.style.top = card.y + 'px'; updateEdges(); }
-    }
-  });
-  el.addEventListener('pointercancel', e=>{ dragging=false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId);}catch{} snapshot(); });
-}
-
-function makeTextBoxView(box){
+function createTextElement(box){
   const el = document.createElement('div');
-  el.className = 'textbox';
-  el.id = box.id;
+  el.className = 'card textNode';
+  el.id = 'card-' + box.id;
   el.style.left = box.x + 'px';
   el.style.top = box.y + 'px';
-  el.textContent = box.content || '';
-  el.contentEditable = true; el.spellcheck = false;
-  el.addEventListener('click', e=>{ e.stopPropagation(); selectElement(box.id,'textbox'); openEditor(box.id,'textbox'); });
-  // drag
+  el.innerHTML = `<div class="info"><div class="name">${box.content || 'Text Label'}</div></div>`;
+  el.addEventListener('click', e => { e.stopPropagation(); selectNode(box.id); openEditor(box.id, true); });
   let dragging=false, offset={x:0,y:0};
   el.addEventListener('pointerdown', e=>{ dragging=true; el.classList.add('dragging'); el.setPointerCapture(e.pointerId); const wp = clientToWorld(e.clientX,e.clientY); offset.x = wp.x - box.x; offset.y = wp.y - box.y; });
   el.addEventListener('pointermove', e=>{ if(!dragging) return; const wp = clientToWorld(e.clientX,e.clientY); box.x = wp.x - offset.x; box.y = wp.y - offset.y; el.style.left = box.x + 'px'; el.style.top = box.y + 'px'; });
   el.addEventListener('pointerup', e=>{ dragging=false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId);}catch{} snapshot(); });
-  el.addEventListener('pointercancel', e=>{ dragging=false; el.classList.remove('dragging'); try{ el.releasePointerCapture(e.pointerId);}catch{} snapshot(); });
-  el.addEventListener('input', e=>{ box.content = el.textContent; });
   cardsLayer.appendChild(el);
   return el;
 }
 
-function makeEdgeView(edge){
+function createEdgeElement(edge){
   const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
   ln.setAttribute('stroke','#9fbfdc'); ln.setAttribute('stroke-width','3'); ln.dataset.eid = edge.id;
   wires.appendChild(ln);
   return ln;
 }
 
-function anchorCenter(cardId){
-  const el = document.getElementById(cardId);
+function anchorCenter(nodeId){
+  const el = document.getElementById('card-'+nodeId);
   if(!el) return null;
   const anchor = el.querySelector('.anchor');
-  if(!anchor) return null;
-  const aRect = anchor.getBoundingClientRect();
+  const rect = anchor.getBoundingClientRect();
   const stageRect = stage.getBoundingClientRect();
-  return { x: (aRect.left + aRect.width/2 - stageRect.left - tx)/scale, y: (aRect.top + aRect.height/2 - stageRect.top - ty)/scale };
+  return { x: (rect.left + rect.width/2 - stageRect.left - tx) / scale, y: (rect.top + rect.height/2 - stageRect.top - ty) / scale };
 }
 
-function updateEdge(edge){
-  const a = anchorCenter(edge.a.card), b = anchorCenter(edge.b.card);
+function updateEdgePosition(edge){
   const ln = wires.querySelector(`line[data-eid="${edge.id}"]`);
-  if(!a || !b || !ln) return;
-  ln.setAttribute('x1', a.x); ln.setAttribute('y1', a.y); ln.setAttribute('x2', b.x); ln.setAttribute('y2', b.y);
+  if(!ln) return;
+  const a = anchorCenter(edge.source);
+  const b = anchorCenter(edge.target);
+  if(!a || !b){ ln.remove(); return; }
+  ln.setAttribute('x1', a.x); ln.setAttribute('y1', a.y);
+  ln.setAttribute('x2', b.x); ln.setAttribute('y2', b.y);
 }
 
 function updateEdges(){
-  // ensure lines exist for each edge
-  edges.forEach(e => {
+  // ensure svg lines exist
+  Object.values(edges).forEach(e=>{
     let ln = wires.querySelector(`line[data-eid="${e.id}"]`);
-    if(!ln) ln = makeEdgeView(e);
-    updateEdge(e);
-  });
-  // remove lines for edges that got removed
-  Array.from(wires.querySelectorAll('line')).forEach(line=>{
-    const eid = line.dataset.eid;
-    if(!edges.some(e=>e.id===eid)) line.remove();
+    if(!ln) ln = createEdgeElement(e);
+    updateEdgePosition(e);
   });
 }
 
-function render(){
+function renderAll(){
+  // clear and rebuild DOM card elements (simple, robust)
   cardsLayer.innerHTML = '';
   wires.innerHTML = '';
-  // render cards
-  cards.forEach(c=> makeCardView(c));
-  // render textboxes
-  textBoxes.forEach(t=> makeTextBoxView(t));
+  // nodes
+  Object.values(cards).forEach(n=>{
+    if(n.isText) createTextElement(n);
+    else createCardElement(n);
+  });
   // edges
-  edges.forEach(e=> makeEdgeView(e));
+  Object.values(edges).forEach(e => createEdgeElement(e));
   updateEdges();
   applyTransform();
-  // update minimap and ensure it's zoomed to fit whole workspace
-  renderMinimap(true);
+  renderMinimapAutoFit();
 }
 
-/* =============================
+/* ======================
    History: undo/redo
-   ============================= */
+   ====================== */
 function snapshot(){
-  undoStack.push(JSON.stringify({cards, textBoxes, edges, tx, ty, scale}));
-  if(undoStack.length>80) undoStack.shift();
+  const state = {
+    cards: JSON.parse(JSON.stringify(cards)),
+    edges: JSON.parse(JSON.stringify(edges)),
+    tx, ty, scale
+  };
+  undoStack.push(state);
+  if(undoStack.length>100) undoStack.shift();
   redoStack = [];
 }
 function undo(){
   if(!undoStack.length){ toast('Nothing to undo'); return; }
-  redoStack.push(JSON.stringify({cards, textBoxes, edges, tx, ty, scale}));
-  const s = JSON.parse(undoStack.pop());
-  loadState(s);
-  render();
+  redoStack.push({cards: JSON.parse(JSON.stringify(cards)), edges: JSON.parse(JSON.stringify(edges)), tx, ty, scale});
+  const st = undoStack.pop();
+  cards = JSON.parse(JSON.stringify(st.cards));
+  edges = JSON.parse(JSON.stringify(st.edges));
+  tx = st.tx; ty = st.ty; scale = st.scale;
+  renderAll();
   toast('Undo');
 }
 function redo(){
   if(!redoStack.length){ toast('Nothing to redo'); return; }
-  undoStack.push(JSON.stringify({cards, textBoxes, edges, tx, ty, scale}));
-  const s = JSON.parse(redoStack.pop());
-  loadState(s);
-  render();
+  undoStack.push({cards: JSON.parse(JSON.stringify(cards)), edges: JSON.parse(JSON.stringify(edges)), tx, ty, scale});
+  const st = redoStack.pop();
+  cards = JSON.parse(JSON.stringify(st.cards));
+  edges = JSON.parse(JSON.stringify(st.edges));
+  tx = st.tx; ty = st.ty; scale = st.scale;
+  renderAll();
   toast('Redo');
 }
-function loadState(state){
-  cards = state.cards || []; textBoxes = state.textBoxes || []; edges = state.edges || []; tx = state.tx || 0; ty = state.ty || 0; scale = state.scale || 1;
-  applyTransform();
-}
 
-/* =============================
+/* ======================
    Selection & Editor
-   ============================= */
-function selectElement(id, type){
-  if(selected){ const prev = document.getElementById(selected); if(prev) prev.classList.remove('selected'); }
-  selected = id; selectedType = type;
-  const el = document.getElementById(id); if(el) el.classList.add('selected');
-}
-const editor = document.getElementById('editor');
-
-function openEditor(id, type){
-  editor.style.display = 'block'; editor.setAttribute('aria-hidden','false');
-  selected = id; selectedType = type;
-  // clear fields
-  document.getElementById('fImage').value = '';
-  document.getElementById('fName').value = '';
-  document.getElementById('fDesc').value = '';
-  fillBranchSelect();
-  fillRankSelect('None');
-  document.getElementById('fSubbranch').value = '';
-  document.getElementById('fStatus').value = 'Unknown';
-  document.getElementById('selectFiles').innerHTML = '<option disabled>Loading...</option>';
-  document.getElementById('inputExternalFile').value = ''; document.getElementById('inputExternalName').value = '';
-  document.getElementById('checkboxSnap').checked = false;
-  document.getElementById('relatedList').innerHTML = '(no attachments)';
-
-  if(type === 'card'){
-    const node = cards.find(n=>n.id===id);
-    if(!node) return;
-    document.getElementById('fImage').value = node.data.image || '';
-    document.getElementById('fName').value = node.data.name || '';
-    fillBranchSelect(node.data.branch || 'None');
-    fillRankSelect(node.data.branch || 'None', node.data.rank || 'None');
-    document.getElementById('fSubbranch').value = node.data.subbranch || '';
-    document.getElementById('fStatus').value = node.data.status || 'Unknown';
-    document.getElementById('fDesc').value = node.data.desc || '';
-    document.getElementById('checkboxSnap').checked = !!node.data.enableSnap;
-    populateFiles(node.data.files || []);
-    renderFileList(node.data.files || [], node.data.externalFiles || []);
-    // focus
-    document.getElementById('fName').focus();
-  } else if(type === 'textbox'){
-    const t = textBoxes.find(x=>x.id===id);
-    if(!t) return;
-    document.getElementById('fDesc').value = t.content || '';
-    document.getElementById('fName').focus();
+   ====================== */
+function selectNode(id){
+  // clear previous selection
+  if(selectedId){
+    const prev = document.getElementById('card-'+selectedId);
+    if(prev) prev.classList.remove('selected');
   }
+  selectedId = id;
+  const el = document.getElementById('card-'+id);
+  if(el) el.classList.add('selected');
+  selectedType = (cards[id] && cards[id].isText) ? 'text' : 'node';
+}
+
+const editPanel = document.getElementById('editPanel');
+
+function openEditor(nodeId, isText=false){
+  if(!nodeId) return;
+  selectNode(nodeId);
+  const node = cards[nodeId];
+  // populate selects
+  populateFactionSelect();
+  // if text node, fill fDesc with content and show minimal UI (we still use same panel, but prefer description)
+  if(node.isText){
+    document.getElementById('fImage').value = '';
+    document.getElementById('fName').value = node.data.name || '';
+    document.getElementById('fStatus').value = 'Unknown';
+    document.getElementById('fFaction').value = 'None';
+    document.getElementById('fSubbranch').value = '';
+    document.getElementById('fRank').value = 'None';
+    document.getElementById('fDesc').value = node.data.name || '';
+    document.getElementById('selectFiles').innerHTML = '';
+    document.getElementById('fExternalUrl').value = '';
+    document.getElementById('fExternalName').value = '';
+    document.getElementById('fEnableSnap').checked = !!node.data.enableSnap;
+    editPanel.style.display = 'block';
+    editPanel.setAttribute('aria-hidden','false');
+    document.getElementById('fName').focus();
+    return;
+  }
+  const d = node.data || {};
+  document.getElementById('fImage').value = d.image || '';
+  document.getElementById('fName').value = d.name || '';
+  document.getElementById('fStatus').value = d.status || 'Unknown';
+  populateFactionSelect(d.faction || 'None');
+  populateRanks(d.faction || 'None', d.rank || 'None');
+  document.getElementById('fSubbranch').value = d.subBranch || '';
+  document.getElementById('fRank').value = d.rank || 'None';
+  document.getElementById('fDesc').value = d.details || '';
+  document.getElementById('fEnableSnap').checked = !!d.enableSnap;
+  // populate attached files list (selectFiles)
+  populateFilesForSelect(d.files || []).then(()=>{});
+  // clear external fields
+  document.getElementById('fExternalUrl').value = '';
+  document.getElementById('fExternalName').value = '';
+  editPanel.style.display = 'block';
+  editPanel.setAttribute('aria-hidden','false');
+  document.getElementById('fName').focus();
 }
 
 function closeEditor(){
-  selected = null; selectedType = null;
-  editor.style.display = 'none'; editor.setAttribute('aria-hidden','true');
+  editPanel.style.display = 'none';
+  editPanel.setAttribute('aria-hidden','true');
 }
 
-/* Editor helpers */
-function fillBranchSelect(selected){
-  const sel = document.getElementById('fBranch'); sel.innerHTML = '';
-  Object.keys(branchColors).forEach(b => { const opt=document.createElement('option'); opt.value=b; opt.textContent=b; if(b===selected) opt.selected=true; sel.appendChild(opt); });
-}
-function fillRankSelect(branch, selected){
-  const sel = document.getElementById('fRank'); sel.innerHTML = '';
-  (rankLists[branch] || ['None']).forEach(r => { const o=document.createElement('option'); o.value=r; o.textContent=r; if(r===selected) o.selected=true; sel.appendChild(o); });
-}
-function renderFileList(filesFromDB, externalFiles){
-  const rel = document.getElementById('relatedList'); rel.innerHTML = '';
-  let any = false;
-  (filesFromDB||[]).forEach(f => { any=true; const a=document.createElement('a'); a.href=f.url; a.textContent=f.name || fileNameFromUrl(f.url); a.target='_blank'; a.rel='noopener'; rel.appendChild(a); rel.appendChild(document.createElement('br')); });
-  (externalFiles||[]).forEach(f => { any=true; const a=document.createElement('a'); a.href=f.url; a.textContent=f.name || fileNameFromUrl(f.url); a.target='_blank'; a.rel='noopener'; rel.appendChild(a); rel.appendChild(document.createElement('br')); });
-  if(!any) rel.textContent='(no attachments)';
-}
+/* wire up editor save/cancel */
+document.getElementById('btnCancelPanel').addEventListener('click', ()=>{ closeEditor(); });
+document.getElementById('btnSavePanel').addEventListener('click', async ()=>{
+  if(!selectedId) return;
+  const node = cards[selectedId];
+  if(!node) return;
+  // if text node: save text content into name
+  if(node.isText){
+    node.data.name = document.getElementById('fName').value.trim();
+    // update DOM
+    const el = document.getElementById('card-'+node.id);
+    if(el) el.querySelector('.name').textContent = node.data.name;
+    snapshot();
+    renderAll();
+    closeEditor();
+    return;
+  }
+  // normal profile
+  const img = document.getElementById('fImage').value.trim();
+  const name = document.getElementById('fName').value.trim() || 'Unnamed';
+  const status = document.getElementById('fStatus').value;
+  const faction = document.getElementById('fFaction').value;
+  const subBranch = document.getElementById('fSubbranch').value.trim();
+  const rank = document.getElementById('fRank').value;
+  const details = document.getElementById('fDesc').value.trim();
+  const enableSnap = document.getElementById('fEnableSnap').checked;
+  // selected files from selectFiles
+  const selectedOptions = Array.from(document.getElementById('selectFiles').selectedOptions || []);
+  const filesList = selectedOptions.map(o => JSON.parse(o.value));
+  // external file
+  const extUrl = document.getElementById('fExternalUrl').value.trim();
+  const extName = document.getElementById('fExternalName').value.trim() || fileNameFromUrl(extUrl);
+  if(extUrl) filesList.push({ url: extUrl, name: extName });
+  // assign
+  node.data = node.data || {};
+  node.data.image = img;
+  node.data.name = name;
+  node.data.status = status;
+  node.data.faction = faction;
+  node.data.subBranch = subBranch;
+  node.data.rank = rank;
+  node.data.details = details;
+  node.data.files = filesList;
+  node.data.enableSnap = enableSnap;
+  node.data.branchColor = factionColors[faction] || '#777';
+  // persist to Firebase node path
+  await db.ref('orgchart/nodes/'+node.id).set(node);
+  // update UI
+  snapshot();
+  renderAll();
+  closeEditor();
+});
 
-/* Populate files select (pull from firebase suspects/insurgents/confidential_informants) */
-function populateFiles(selectedFiles){
+/* ======================
+   populateFiles: gathers files from suspects, insurgents, confidential_informants
+   returns promise that resolves when selectFiles is filled
+   ====================== */
+async function populateFilesForSelect(selectedFiles = []){
   const sel = document.getElementById('selectFiles');
-  sel.innerHTML = '<option disabled>Loading files...</option>';
-  const snaps = ['suspects','insurgents','confidential_informants'].map(path => db.ref(path).get());
-  Promise.all(snaps).then(results=>{
-    let files = [];
-    results.forEach(snap => {
+  sel.innerHTML = '<option disabled>Loading...</option>';
+  try{
+    const [susSnap, insSnap, ciSnap] = await Promise.all([
+      db.ref('suspects').get(),
+      db.ref('insurgents').get(),
+      db.ref('confidential_informants').get()
+    ]);
+    const files = [];
+    [susSnap, insSnap, ciSnap].forEach(snap => {
       if(!snap.exists()) return;
       const val = snap.val();
-      Object.values(val).forEach(v => {
-        if(v.docUrl) files.push({ url: v.docUrl, name: (v.target ? v.target : (v.name || fileNameFromUrl(v.docUrl))), metaPath: v.path || '' });
+      Object.keys(val).forEach(k=>{
+        const v = val[k];
+        if(v && v.docUrl){
+          files.push({ url: v.docUrl, name: (v.target ? v.target + ' [' + (v.creator || '') + ']' : fileNameFromUrl(v.docUrl)) });
+        }
       });
     });
     sel.innerHTML = '';
     files.forEach(f=>{
       const opt = document.createElement('option');
       opt.value = JSON.stringify(f);
-      opt.textContent = f.name;
-      // preselect if in selectedFiles
-      if((selectedFiles||[]).some(s => s.url === f.url)) opt.selected = true;
+      opt.textContent = f.name || fileNameFromUrl(f.url);
+      // select if in selectedFiles
+      if(Array.isArray(selectedFiles) && selectedFiles.some(sf => sf.url === f.url)) opt.selected = true;
       sel.appendChild(opt);
     });
-    if(files.length===0) sel.innerHTML = '<option disabled>(no files found)</option>';
-  }).catch(()=>{ sel.innerHTML = '<option disabled>Error loading files</option>'; });
+    if(files.length === 0) sel.innerHTML = '<option disabled>(no files found)</option>';
+  }catch(err){
+    sel.innerHTML = '<option disabled>Error loading</option>';
+    console.error('populateFiles error', err);
+  }
 }
 
-/* =============================
-   Add / Delete nodes & text
-   ============================= */
-document.getElementById('addProfileBtn').addEventListener('click', () => {
+/* ======================
+   Add / Delete / Text nodes
+   ====================== */
+document.getElementById('addProfileBtn').addEventListener('click', ()=>{
   const id = randId('n');
-  const node = {
-    id, x: 100 + Math.random()*300, y: 100 + Math.random()*200,
-    data: { image:'https://i.ibb.co/zhKnjbh1/unknownperson.png', name:'New Profile', branch:'None', subbranch:'', rank:'None', status:'Unknown', desc:'', files:[], externalFiles:[], branchColor: branchColors['None'], enableSnap:false },
-    isText:false
-  };
-  cards.push(node); snapshot(); render(); selectElement(id,'card'); openEditor(id,'card');
+  const node = { id, x: 150 + Math.random()*200, y: 150 + Math.random()*200, isText: false, data: { name:'New Profile', image:'https://i.ibb.co/zhKnjbh1/unknownperson.png', faction:'None', rank:'None', subBranch:'', status:'Unknown', details:'', files:[], enableSnap:false } };
+  cards[id] = node;
+  // add to firebase nodes
+  db.ref('orgchart/nodes/'+id).set(node);
+  snapshot();
+  renderAll();
+  openEditor(id);
 });
 
 document.getElementById('addTextBtn').addEventListener('click', ()=>{
   const id = randId('t');
-  const node = { id, x:200 + Math.random()*200, y:200 + Math.random()*200, data:{name:'New Text'}, isText:true };
-  cards.push(node); snapshot(); render(); selectElement(id,'card'); openEditor(id,'card');
+  const node = { id, x: 200 + Math.random()*200, y: 200 + Math.random()*200, isText: true, data:{ name: 'Text Label' } };
+  cards[id] = node;
+  snapshot();
+  renderAll();
+  openEditor(id, true);
 });
 
 document.getElementById('deleteSelectedBtn').addEventListener('click', ()=>{
-  if(!selected) { alert('Select an item first'); return; }
+  if(!selectedId){ alert('Select a node first'); return; }
   if(!confirm('Delete selected item?')) return;
-  if(selectedType === 'card'){
-    cards = cards.filter(c => c.id !== selected);
-    edges = edges.filter(e => e.a.card !== selected && e.b.card !== selected);
-  } else if(selectedType === 'textbox'){
-    textBoxes = textBoxes.filter(t => t.id !== selected);
+  // delete from firebase if node
+  if(cards[selectedId] && !cards[selectedId].isText){
+    db.ref('orgchart/nodes/'+selectedId).remove().catch(()=>{});
   }
-  const el = document.getElementById(selected); if(el) el.remove();
-  selected = null; selectedType = null;
-  snapshot(); render();
+  // remove edges connected to this id
+  Object.keys(edges).forEach(eid=>{
+    const e = edges[eid];
+    if(e.source === selectedId || e.target === selectedId){
+      db.ref('orgchart/edges/'+eid).remove().catch(()=>{});
+      delete edges[eid];
+    }
+  });
+  // remove card
+  delete cards[selectedId];
+  const el = document.getElementById('card-'+selectedId); if(el) el.remove();
+  selectedId = null;
+  selectedType = null;
+  snapshot();
+  renderAll();
 });
 
-/* double-click stage to add profile */
-viewport.addEventListener('dblclick', e=>{
-  if(e.target.closest('.card') || e.target.closest('.anchor') || e.target.closest('#toolbar') || e.target.closest('#editor')) return;
-  const p = clientToWorld(e.clientX, e.clientY);
-  const id = randId('n');
-  const node = { id, x: p.x - 160, y: p.y - 50, data:{ image:'https://i.ibb.co/zhKnjbh1/unknownperson.png', name:'New Profile', branch:'None', subbranch:'', rank:'None', status:'Unknown', desc:'', files:[], externalFiles:[], branchColor:branchColors['None'], enableSnap:false }, isText:false };
-  cards.push(node); snapshot(); render(); selectElement(id,'card'); openEditor(id,'card');
-});
-
-/* =============================
-   Drag anchor -> create edge
-   ============================= */
-let anchorDrag = { active:false, startCardId:null, tmpLine:null };
+/* ======================
+   Anchor drag linking
+   ====================== */
+let anchorDrag = { active:false, startId:null, tmpLine:null };
 stage.addEventListener('pointerdown', e=>{
-  if(!e.target.classList.contains('anchor')) return;
-  const cardEl = e.target.closest('.card');
+  const target = e.target;
+  if(!target.classList.contains('anchor')) return;
+  const cardEl = target.closest('.card');
   if(!cardEl) return;
   anchorDrag.active = true;
-  anchorDrag.startCardId = cardEl.id;
-  const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
-  ln.setAttribute('stroke','#ffd54f'); ln.setAttribute('stroke-width','3'); ln.setAttribute('stroke-opacity','0.95');
+  anchorDrag.startId = cardEl.id.replace('card-','');
+  // create temporary svg line
+  const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
+  ln.setAttribute('stroke','#ffd54f'); ln.setAttribute('stroke-width','3'); ln.setAttribute('stroke-linecap','round'); ln.setAttribute('stroke-opacity','0.95');
   wires.appendChild(ln);
   anchorDrag.tmpLine = ln;
-  e.target.setPointerCapture(e.pointerId);
-  const s = anchorCenter(anchorDrag.startCardId);
+  const s = anchorCenter(anchorDrag.startId);
   if(s){ ln.setAttribute('x1', s.x); ln.setAttribute('y1', s.y); ln.setAttribute('x2', s.x); ln.setAttribute('y2', s.y); }
+  target.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e=>{
   if(!anchorDrag.active) return;
@@ -518,456 +592,337 @@ stage.addEventListener('pointermove', e=>{
 stage.addEventListener('pointerup', e=>{
   if(!anchorDrag.active) return;
   anchorDrag.active = false;
-  if(anchorDrag.tmpLine) { anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
+  if(anchorDrag.tmpLine){ anchorDrag.tmpLine.remove(); anchorDrag.tmpLine = null; }
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  let targetId = null;
-  if(el){ const cardEl = el.closest('.card'); if(cardEl) targetId = cardEl.id; }
-  if(!targetId || targetId === anchorDrag.startCardId) return;
-  // prevent duplicates
-  if(!edges.some(ed => (ed.a.card === anchorDrag.startCardId && ed.b.card === targetId) || (ed.a.card === targetId && ed.b.card === anchorDrag.startCardId))){
-    const id = randId('e');
-    edges.push({ id, a:{card: anchorDrag.startCardId}, b:{card: targetId} });
-    snapshot(); render();
-  }
+  let targetCard = el ? el.closest('.card') : null;
+  if(!targetCard) return;
+  const targetId = targetCard.id.replace('card-','');
+  if(targetId === anchorDrag.startId) return;
+  // prevent duplicate edges
+  const exists = Object.values(edges).some(ed => (ed.source === anchorDrag.startId && ed.target === targetId) || (ed.source === targetId && ed.target === anchorDrag.startId));
+  if(exists) { toast('Edge exists'); return; }
+  const newId = randId('e');
+  const edgeObj = { id: newId, source: anchorDrag.startId, target: targetId };
+  edges[newId] = edgeObj;
+  // persist in Firebase edges
+  db.ref('orgchart/edges/'+newId).set(edgeObj);
+  snapshot();
+  renderAll();
 });
 
-/* =============================
-   Edge update helper on card move
-   ============================= */
-function updateEdgesOnRender(){
-  // create missing lines
-  edges.forEach(e => {
-    let ln = wires.querySelector(`line[data-eid="${e.id}"]`);
-    if(!ln) makeEdgeView(e);
-  });
-  updateEdges();
-}
-
-/* =============================
-   Snapping by rank
-   ============================= */
-function doSnapForCard(card){
-  if(!card || !card.data) return;
-  const enable = globalSnapping || !!card.data.enableSnap;
-  if(!enable) return;
-  const rankOrder = rankLists[card.data.branch] || [];
-  const myRank = card.data.rank;
-  const idx = rankOrder.indexOf(myRank);
-  if(idx < 0) return;
-  // choose y by index spacing
-  const baseY = 100;
-  const spacing = 110;
-  card.y = baseY + idx * spacing;
-}
-
-/* =============================
-   Editor Save / Cancel logic
-   ============================= */
-document.getElementById('btnSave').addEventListener('click', ()=>{
-  if(!selected) return;
-  if(selectedType === 'card'){
-    const node = cards.find(c => c.id === selected);
-    if(!node) return;
-    node.data.image = document.getElementById('fImage').value.trim();
-    node.data.name = document.getElementById('fName').value.trim();
-    node.data.branch = document.getElementById('fBranch').value;
-    node.data.subbranch = document.getElementById('fSubbranch').value.trim();
-    node.data.rank = document.getElementById('fRank').value;
-    node.data.status = document.getElementById('fStatus').value;
-    node.data.desc = document.getElementById('fDesc').value.trim();
-    node.data.branchColor = branchColors[node.data.branch] || branchColors['None'];
-    node.data.enableSnap = !!document.getElementById('checkboxSnap').checked;
-    // files selected from DB
-    const selOpts = Array.from(document.getElementById('selectFiles').selectedOptions);
-    node.data.files = selOpts.map(o => JSON.parse(o.value));
-    // external file
-    const extUrl = document.getElementById('inputExternalFile').value.trim();
-    const extName = document.getElementById('inputExternalName').value.trim() || fileNameFromUrl(extUrl || '');
-    if(extUrl){
-      node.data.externalFiles = node.data.externalFiles || [];
-      node.data.externalFiles.push({ url: extUrl, name: extName });
-      document.getElementById('inputExternalFile').value=''; document.getElementById('inputExternalName').value='';
-    }
-    renderFileList(node.data.files||[], node.data.externalFiles||[]);
-    // update DOM card
-    const old = document.getElementById(node.id); if(old) old.remove();
-    snapshot(); render();
-    // save this node to firebase under orgchart/nodes/<id> (so individual nodes persist)
-    db.ref('orgchart/nodes/' + node.id).set(node).catch(console.error);
-  } else if(selectedType === 'textbox'){
-    const t = textBoxes.find(x=>x.id===selected);
-    if(!t) return;
-    t.content = document.getElementById('fDesc').value.trim();
-    const old = document.getElementById(t.id); if(old) old.textContent = t.content;
-    snapshot(); render();
-  }
-  closeEditor();
-});
-
-document.getElementById('btnCancel').addEventListener('click', ()=> closeEditor());
-
-/* =============================
-   Files populate: pull docs from suspects / insurgents / confidential_informants
-   ============================= */
-function populateFiles(selectedFiles){
-  const sel = document.getElementById('selectFiles');
-  sel.innerHTML = '<option disabled>Loading files...</option>';
-  Promise.all([ db.ref('suspects').get(), db.ref('insurgents').get(), db.ref('confidential_informants').get() ])
-    .then(snaps => {
-      let files = [];
-      snaps.forEach(snap => {
-        if(!snap.exists()) return;
-        Object.values(snap.val()).forEach(v => {
-          if(v.docUrl) files.push({ url: v.docUrl, name: (v.target || v.name || fileNameFromUrl(v.docUrl)), meta: v });
-        });
-      });
-      sel.innerHTML = '';
-      files.forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = JSON.stringify(f);
-        opt.textContent = f.name;
-        if((selectedFiles||[]).some(s => s.url === f.url)) opt.selected = true;
-        sel.appendChild(opt);
-      });
-      if(files.length===0) sel.innerHTML = '<option disabled>(no files found)</option>';
-    }).catch(err => { sel.innerHTML = '<option disabled>Error loading</option>'; console.error(err); });
-}
-
-/* =============================
-   Workspace (save/load/delete) - connectionWebs/<name>
-   ============================= */
-async function refreshWebList(){
-  try{
-    const snap = await db.ref('connectionWebs').once('value');
-    const obj = snap.val() || {};
-    webListDropdown.innerHTML = '<option value="">(select)</option>';
-    Object.keys(obj).sort().forEach(k => {
-      const o = document.createElement('option'); o.value = k; o.textContent = k; webListDropdown.appendChild(o);
-    });
-    // if last saved in localStorage, select it
-    const last = localStorage.getItem('lastWeb');
-    if(last && obj[last]){ webListDropdown.value = last; webNameInput.value = last; subscribeToWeb(last); }
-  }catch(err){ console.error('refresh list', err); }
-}
-
-async function saveCurrentWeb(){
-  const name = webNameInput.value.trim();
-  if(!name) return alert('Enter a name for the workspace');
-  const data = { cards, edges, textBoxes, tx, ty, scale, updatedAt: Date.now() };
-  await db.ref('connectionWebs/' + name).set(data);
-  toast('Saved: ' + name);
-  await refreshWebList();
-  currentWeb = name;
-  localStorage.setItem('lastWeb', name);
-}
-
-async function deleteCurrentWeb(){
-  const name = webListDropdown.value || webNameInput.value.trim();
-  if(!name) return alert('Select a workspace to delete');
-  const confirmText = prompt(`Type DELETE to confirm deletion of "${name}"`);
-  if(confirmText !== 'DELETE') return alert('Cancelled');
-  if(currentWeb === name && currentWebListener) {
-    db.ref('connectionWebs/' + name).off('value', currentWebListener);
-    currentWebListener = null; currentWeb = null;
-  }
-  await db.ref('connectionWebs/' + name).remove();
-  toast('Deleted: ' + name);
-  await refreshWebList();
-}
-
-function subscribeToWeb(name){
-  if(currentWebListener && currentWeb) db.ref('connectionWebs/' + currentWeb).off('value', currentWebListener);
-  if(!name) return;
-  currentWeb = name;
-  localStorage.setItem('lastWeb', name);
-  webNameInput.value = name;
-  const ref = db.ref('connectionWebs/' + name);
-  currentWebListener = ref.on('value', snap => {
-    const data = snap.val();
-    if(!data){ toast('No data for ' + name); cards=[]; edges=[]; textBoxes=[]; render(); return; }
-    cards.splice(0, cards.length, ...(data.cards || []));
-    edges.splice(0, edges.length, ...(data.edges || []));
-    textBoxes.splice(0, textBoxes.length, ...(data.textBoxes || []));
-    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
-    applyTransform(); render();
-    toast('Synced: ' + name);
-  }, err => { console.error('sync err', err); alert('Sync error: ' + err.message); });
-}
-
-/* UI bindings */
-document.getElementById('saveWebBtn').addEventListener('click', saveCurrentWeb);
-document.getElementById('deleteWebBtn').addEventListener('click', deleteCurrentWeb);
-document.getElementById('loadWebBtn').addEventListener('click', ()=> {
-  const name = webNameInput.value.trim() || webListDropdown.value;
-  if(!name) return alert('Enter or select a workspace name');
-  subscribeToWeb(name);
-  toast('Subscribed to: ' + name);
-});
-webListDropdown.addEventListener('change', e=>{ const v = e.target.value; if(!v) return; webNameInput.value = v; subscribeToWeb(v); localStorage.setItem('lastWeb', v); });
-
-/* =============================
-   Minimap: auto-fit and click-to-pan
-   ============================= */
-function renderMinimap(forceFit=false){
-  const mm = minimapSVG;
-  while(mm.firstChild) mm.removeChild(mm.firstChild);
-  const padding = 20;
-  // compute bounds of content (cards + textboxes + small margin)
-  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-  const all = cards.concat(textBoxes);
-  if(all.length === 0){
-    // empty workspace -> draw small dot
-    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    rect.setAttribute('x', 90); rect.setAttribute('y', 40); rect.setAttribute('width', 40); rect.setAttribute('height', 24);
-    rect.setAttribute('fill', '#234');
-    mm.appendChild(rect);
-    return;
-  }
-  all.forEach(item=>{
-    minx = Math.min(minx, item.x);
-    miny = Math.min(miny, item.y);
-    maxx = Math.max(maxx, item.x + (item.isText ? 60 : 320));
-    maxy = Math.max(maxy, item.y + (item.isText ? 24 : 120));
-  });
-  // add margin
-  minx -= padding; miny -= padding; maxx += padding; maxy += padding;
-  const contentW = Math.max(1, maxx - minx);
-  const contentH = Math.max(1, maxy - miny);
-  const mmW = mm.clientWidth, mmH = mm.clientHeight;
-  // compute scale to fit content into minimap
-  const sx = mmW / contentW, sy = mmH / contentH;
-  const s = Math.min(sx, sy);
-  // draw edges scaled
-  edges.forEach(e=>{
-    const aItem = cards.find(c=>c.id === e.a.card);
-    const bItem = cards.find(c=>c.id === e.b.card);
-    if(!aItem || !bItem) return;
-    const ax = (aItem.x - minx) * s, ay = (aItem.y - miny) * s + 6;
-    const bx = (bItem.x - minx) * s, by = (bItem.y - miny) * s + 6;
-    const ln = document.createElementNS("http://www.w3.org/2000/svg","line");
-    ln.setAttribute('x1', ax); ln.setAttribute('y1', ay); ln.setAttribute('x2', bx); ln.setAttribute('y2', by);
-    ln.setAttribute('stroke', '#557'); ln.setAttribute('stroke-width', '1'); mm.appendChild(ln);
-  });
-  // draw cards
-  cards.forEach(c=>{
-    const rx = (c.x - minx)*s, ry = (c.y - miny)*s;
-    const r = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    r.setAttribute('x', rx); r.setAttribute('y', ry);
-    r.setAttribute('width', Math.max(8, 40*s/ (contentW/320))); r.setAttribute('height', Math.max(6, 18*s/ (contentH/120)));
-    r.setAttribute('fill', c.data && c.data.branchColor ? c.data.branchColor : '#444');
-    mm.appendChild(r);
-  });
-  // draw textboxes
-  textBoxes.forEach(t=>{
-    const txp = (t.x - minx)*s, typ = (t.y - miny)*s;
-    const r = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    r.setAttribute('x', txp); r.setAttribute('y', typ);
-    r.setAttribute('width', 14); r.setAttribute('height', 10);
-    r.setAttribute('fill', '#888'); mm.appendChild(r);
-  });
-  // draw viewport rect (where current viewport maps)
-  const viewX = (-tx/scale - minx) * s;
-  const viewY = (-ty/scale - miny) * s;
-  const viewW = (stage.clientWidth / scale) * s;
-  const viewH = (stage.clientHeight / scale) * s;
-  const viewRect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-  viewRect.setAttribute('x', viewX); viewRect.setAttribute('y', viewY);
-  viewRect.setAttribute('width', viewW); viewRect.setAttribute('height', viewH);
-  viewRect.setAttribute('stroke', '#0f0'); viewRect.setAttribute('stroke-width', '1'); viewRect.setAttribute('fill', 'none');
-  mm.appendChild(viewRect);
-
-  // If forceFit, adjust main viewport to center and show whole content
-  if(forceFit){
-    // compute center in world coords
-    const centerX = (minx + maxx) / 2;
-    const centerY = (miny + maxy) / 2;
-    const desiredScaleX = stage.clientWidth / contentW;
-    const desiredScaleY = stage.clientHeight / contentH;
-    const desiredScale = Math.min(desiredScaleX, desiredScaleY) * 0.85; // small padding
-    scale = Math.max(0.25, Math.min(2, desiredScale));
-    tx = stage.clientWidth/2 - centerX * scale;
-    ty = stage.clientHeight/2 - centerY * scale;
-    applyTransform();
-  }
-}
-
-// minimap click handler -> pan to clicked point
-minimapSVG.addEventListener('click', function(e){
-  const rect = minimapSVG.getBoundingClientRect();
-  // we need same bounds as in renderMinimap
-  // reconstruct bounds
-  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
-  const all = cards.concat(textBoxes);
-  if(all.length === 0) return;
-  all.forEach(item => { minx = Math.min(minx, item.x); miny = Math.min(miny, item.y); maxx = Math.max(maxx, item.x + (item.isText ? 60 : 320)); maxy = Math.max(maxy, item.y + (item.isText ? 24 : 120)); });
-  const padding = 20;
-  minx -= padding; miny -= padding; maxx += padding; maxy += padding;
-  const contentW = Math.max(1, maxx - minx);
-  const contentH = Math.max(1, maxy - miny);
-  const mmW = minimapSVG.clientWidth, mmH = minimapSVG.clientHeight;
-  const sx = mmW / contentW, sy = mmH / contentH;
-  const s = Math.min(sx, sy);
-  const clickedX = e.clientX - rect.left;
-  const clickedY = e.clientY - rect.top;
-  // convert to world
-  const worldX = minx + clickedX / s;
-  const worldY = miny + clickedY / s;
-  // center viewport on worldX, worldY
-  tx = stage.clientWidth/2 - worldX * scale;
-  ty = stage.clientHeight/2 - worldY * scale;
-  applyTransform();
-  render();
-});
-
-/* =============================
-   Zoom & Pan handling
-   ============================= */
+/* ======================
+   Zoom / Pan
+   ====================== */
 let isPanning = false, panStart = {x:0,y:0}, panOrigin = {tx:0,ty:0};
 stage.addEventListener('pointerdown', e=>{
-  if(e.target.closest('.card') || e.target.closest('.anchor') || e.target.closest('#toolbar') || e.target.closest('#editor') || e.target.closest('#minimap')) return;
-  isPanning = true; panStart.x = e.clientX; panStart.y = e.clientY; panOrigin.tx = tx; panOrigin.ty = ty;
-  stage.style.cursor = 'grabbing'; stage.setPointerCapture(e.pointerId);
+  // ignore if starting pointer on card or editor or minimap
+  if(e.target.closest('.card') || e.target.closest('#editPanel') || e.target.closest('#minimap')) return;
+  isPanning = true;
+  panStart.x = e.clientX; panStart.y = e.clientY;
+  panOrigin.tx = tx; panOrigin.ty = ty;
+  stage.style.cursor = 'grabbing';
+  stage.setPointerCapture(e.pointerId);
 });
 stage.addEventListener('pointermove', e=>{
   if(!isPanning) return;
   const dx = e.clientX - panStart.x, dy = e.clientY - panStart.y;
   tx = panOrigin.tx + dx; ty = panOrigin.ty + dy;
   applyTransform();
-  render();
+  updateEdges();
 });
 stage.addEventListener('pointerup', e=>{
-  if(!isPanning) return; isPanning = false; stage.style.cursor = 'grab'; try{ stage.releasePointerCapture(e.pointerId);}catch{} snapshot();
+  if(!isPanning) return;
+  isPanning = false;
+  stage.style.cursor = 'grab';
+  try{ stage.releasePointerCapture(e.pointerId); }catch{}
+  snapshot();
 });
-stage.addEventListener('pointercancel', e=>{ if(!isPanning) return; isPanning = false; stage.style.cursor = 'grab'; try{ stage.releasePointerCapture(e.pointerId);}catch{} snapshot(); });
-
-// wheel zoom (centered at mouse)
+stage.addEventListener('pointercancel', e=>{
+  if(!isPanning) return;
+  isPanning = false;
+  stage.style.cursor = 'grab';
+  try{ stage.releasePointerCapture(e.pointerId); }catch{}
+  snapshot();
+});
 stage.addEventListener('wheel', e=>{
   e.preventDefault();
   const zoomFactor = 1.12;
   const mouse = clientToWorld(e.clientX, e.clientY);
   if(e.deltaY < 0) scale *= zoomFactor; else scale /= zoomFactor;
   scale = Math.max(0.25, Math.min(4, scale));
-  tx = e.clientX - mouse.x * scale; ty = e.clientY - mouse.y * scale;
-  applyTransform(); render();
-}, { passive: false });
+  tx = e.clientX - mouse.x * scale;
+  ty = e.clientY - mouse.y * scale;
+  applyTransform();
+  updateEdges();
+}, {passive:false});
 
-/* =============================
-   Keyboard Shortcuts
-   ============================= */
-window.addEventListener('keydown', e=>{
-  if((e.ctrlKey || e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); }
-  if((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))){ e.preventDefault(); redo(); }
-  if(e.key === 'Delete' || e.key === 'Backspace'){ if(selected) document.getElementById('deleteSelectedBtn').click(); }
+/* ======================
+   Minimap that fits whole workspace
+   ====================== */
+function renderMinimapAutoFit(){
+  // compute bounding box of nodes and textBoxes
+  const nodes = Object.values(cards);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n=>{
+    if(n.x < minX) minX = n.x;
+    if(n.y < minY) minY = n.y;
+    if(n.x > maxX) maxX = n.x;
+    if(n.y > maxY) maxY = n.y;
+  });
+  if(minX === Infinity){ minX = 0; minY = 0; maxX = stage.clientWidth; maxY = stage.clientHeight; }
+  // add padding
+  const pad = 200;
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+  const w = maxX - minX, h = maxY - minY;
+  // svg size
+  const svgW = minimapSVG.clientWidth || 240, svgH = minimapSVG.clientHeight || 160;
+  const scaleMM = Math.min(svgW / w, svgH / h);
+  // clear svg
+  while(minimapSVG.firstChild) minimapSVG.removeChild(minimapSVG.firstChild);
+  // draw edges
+  Object.values(edges).forEach(e=>{
+    const a = cards[e.source], b = cards[e.target];
+    if(!a || !b) return;
+    const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1', (a.x - minX) * scaleMM);
+    ln.setAttribute('y1', (a.y - minY) * scaleMM);
+    ln.setAttribute('x2', (b.x - minX) * scaleMM);
+    ln.setAttribute('y2', (b.y - minY) * scaleMM);
+    ln.setAttribute('stroke', '#888');
+    ln.setAttribute('stroke-width', 1);
+    minimapSVG.appendChild(ln);
+  });
+  // draw nodes
+  Object.values(cards).forEach(n=>{
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', (n.x - minX) * scaleMM);
+    rect.setAttribute('y', (n.y - minY) * scaleMM);
+    rect.setAttribute('width', Math.max(6, 36 * Math.min(1, scaleMM)));
+    rect.setAttribute('height', Math.max(4, 20 * Math.min(1, scaleMM)));
+    rect.setAttribute('fill', (n.data && n.data.branchColor) ? n.data.branchColor : '#555');
+    minimapSVG.appendChild(rect);
+  });
+  // viewport rect representing current translated/scale view
+  const viewRect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  const viewX = (-tx - minX*scale) / scale;
+  const viewY = (-ty - minY*scale) / scale;
+  // But simpler: compute world coords of viewport corners
+  const worldTopLeft = { x: (-tx) / scale, y: (-ty) / scale };
+  const worldBottomRight = { x: (window.innerWidth - tx) / scale, y: (window.innerHeight - ty) / scale };
+  const vx = (worldTopLeft.x - minX) * scaleMM;
+  const vy = (worldTopLeft.y - minY) * scaleMM;
+  const vw = (worldBottomRight.x - worldTopLeft.x) * scaleMM;
+  const vh = (worldBottomRight.y - worldTopLeft.y) * scaleMM;
+  viewRect.setAttribute('x', vx);
+  viewRect.setAttribute('y', vy);
+  viewRect.setAttribute('width', Math.max(1, vw));
+  viewRect.setAttribute('height', Math.max(1, vh));
+  viewRect.setAttribute('stroke', '#0f0');
+  viewRect.setAttribute('stroke-width', 1.5);
+  viewRect.setAttribute('fill', 'none');
+  minimapSVG.appendChild(viewRect);
+}
+
+/* minimap click to pan */
+minimapSVG.addEventListener('click', e=>{
+  const rect = minimapSVG.getBoundingClientRect();
+  const clickX = e.clientX - rect.left, clickY = e.clientY - rect.top;
+  // reconstruct minX/minY/w/h as above
+  const nodes = Object.values(cards);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n=>{ if(n.x < minX) minX = n.x; if(n.y < minY) minY = n.y; if(n.x > maxX) maxX = n.x; if(n.y > maxY) maxY = n.y; });
+  if(minX === Infinity){ minX = 0; minY = 0; maxX = stage.clientWidth; maxY = stage.clientHeight; }
+  const pad=200; minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+  const w = maxX - minX, h = maxY - minY;
+  const svgW = rect.width, svgH = rect.height;
+  const scaleMM = Math.min(svgW / w, svgH / h);
+  const worldX = minX + clickX / scaleMM;
+  const worldY = minY + clickY / scaleMM;
+  // center viewport on worldX/worldY
+  tx = window.innerWidth/2 - worldX*scale;
+  ty = window.innerHeight/2 - worldY*scale;
+  applyTransform(); updateEdges(); renderMinimapAutoFit();
 });
 
-/* =============================
-   Save nodes individually to firebase on load (sync)
-   and ability to load nodes from orgchart path on init
-   ============================= */
-async function loadOrgchartNodes(){
+/* ======================
+   Firebase: load orgchart nodes/edges listener
+   ====================== */
+function listenOrgchart(){
+  db.ref('orgchart').on('value', snapshot=>{
+    const v = snapshot.val() || {};
+    // load nodes
+    cards = {};
+    if(v.nodes){
+      Object.keys(v.nodes).forEach(k=>{
+        cards[k] = v.nodes[k];
+      });
+    }
+    // load edges
+    edges = {};
+    if(v.edges){
+      Object.keys(v.edges).forEach(k=>{
+        edges[k] = v.edges[k];
+      });
+    }
+    renderAll();
+  });
+}
+
+/* initial call */
+listenOrgchart();
+
+/* ======================
+   Workspace Save / Load / Delete
+   saved under 'connectionWebs/<name>' with structure { cards, edges, tx, ty, scale }
+   ====================== */
+async function refreshWorkspaceList(){
   try{
-    const snap = await db.ref('orgchart/nodes').get();
-    if(!snap.exists()) return;
-    const val = snap.val();
-    // merge nodes into current workspace only if id doesn't exist
-    Object.keys(val).forEach(id=>{
-      if(!cards.some(c=>c.id === id)){
-        cards.push(val[id]);
-      }
+    const snap = await db.ref('connectionWebs').once('value');
+    const val = snap.val() || {};
+    webListDropdown.innerHTML = '';
+    Object.keys(val).sort().forEach(k=>{
+      const opt = document.createElement('option'); opt.value = k; opt.textContent = k; webListDropdown.appendChild(opt);
     });
-    render();
-  }catch(err){ console.error('load nodes', err); }
+    const last = localStorage.getItem('lastWeb');
+    if(last && val[last]){ webListDropdown.value = last; webNameInput.value = last; subscribeToWorkspace(last); }
+  }catch(err){ console.error('refreshWorkspaceList', err); }
 }
 
-// Initialize workspace list
-refreshWebList().then(()=>{}).catch(()=>{});
-loadOrgchartNodes().then(()=>{render();});
-
-/* =============================
-   Export / Import helpers
-   ============================= */
-function exportJSON(){
-  const data = { cards, textBoxes, edges };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = (webNameInput.value || 'workspace') + '.json'; a.click();
-  URL.revokeObjectURL(url);
+async function saveWorkspace(){
+  const name = webNameInput.value.trim();
+  if(!name){ alert('Enter a workspace name'); return; }
+  // copy objects
+  const payload = { cards, edges, tx, ty, scale, updatedAt: Date.now() };
+  try{
+    await db.ref('connectionWebs/'+name).set(payload);
+    toast('Saved workspace: '+name);
+    await refreshWorkspaceList();
+    localStorage.setItem('lastWeb', name);
+  }catch(err){ alert('Save failed: '+err.message); }
 }
 
-function exportPNG(){
-  // quick trick: capture viewport by serializing SVG + HTML into canvas is complex;
-  // For now show placeholder and user can use screenshot. Could integrate html2canvas if requested.
-  alert('PNG export not implemented. I can add html2canvas export on request.');
+function subscribeToWorkspace(name){
+  if(!name) return;
+  if(window.currentWorkspaceListener){
+    db.ref('connectionWebs/'+window.currentWorkspaceName).off('value', window.currentWorkspaceListener);
+    window.currentWorkspaceListener = null; window.currentWorkspaceName = null;
+  }
+  const ref = db.ref('connectionWebs/'+name);
+  window.currentWorkspaceListener = ref.on('value', snap=>{
+    const data = snap.val();
+    if(!data){ toast('No data for '+name); return; }
+    cards = data.cards || {};
+    edges = data.edges || {};
+    tx = data.tx || 0; ty = data.ty || 0; scale = data.scale || 1;
+    applyTransform(); renderAll();
+    toast('Loaded workspace: '+name);
+  }, err => {
+    alert('Sync failed: '+err.message);
+  });
+  window.currentWorkspaceName = name;
 }
 
-/* =============================
-   Utility: check duplicates before edge creation (already done)
-   ============================= */
+async function loadWorkspace(){
+  const name = webNameInput.value.trim() || webListDropdown.value;
+  if(!name){ alert('Select a workspace to load'); return; }
+  subscribeToWorkspace(name);
+  localStorage.setItem('lastWeb', name);
+}
 
-/* =============================
-   Snap defaults toggler
-   ============================= */
-document.getElementById('saveWebBtn').addEventListener('dblclick', ()=>{ globalSnapping = !globalSnapping; toast('Global snapping: ' + (globalSnapping ? 'On' : 'Off')); });
+async function deleteWorkspace(){
+  const name = webListDropdown.value || webNameInput.value.trim();
+  if(!name){ alert('Select a workspace to delete'); return; }
+  const confirmText = prompt(`Type DELETE to confirm deletion of "${name}"`);
+  if(confirmText !== 'DELETE'){ alert('Deletion canceled'); return; }
+  try{
+    if(window.currentWorkspaceListener && window.currentWorkspaceName === name){
+      db.ref('connectionWebs/'+name).off('value', window.currentWorkspaceListener);
+      window.currentWorkspaceListener = null; window.currentWorkspaceName = null;
+    }
+    await db.ref('connectionWebs/'+name).remove();
+    toast('Deleted workspace: '+name);
+    await refreshWorkspaceList();
+  }catch(err){ alert('Delete failed: '+err.message); }
+}
 
-/* =============================
-   Populate branch/select handlers
-   ============================= */
-document.getElementById('fBranch').addEventListener('change', e=>{
-  fillRankSelect(e.target.value, null);
-});
+/* wire workspace buttons */
+document.getElementById('saveWebBtn').addEventListener('click', saveWorkspace);
+document.getElementById('loadWebBtn').addEventListener('click', loadWorkspace);
+document.getElementById('deleteWebBtn').addEventListener('click', deleteWorkspace);
+document.getElementById('webListDropdown').addEventListener('change', e => { const v = e.target.value; if(v){ webNameInput.value = v; localStorage.setItem('lastWeb', v); } });
 
-/* =============================
-   Search
-   ============================= */
+/* on load, refresh workspace list */
+refreshWorkspaceList();
+
+/* ======================
+   populate faction/rank selects in editor
+   ====================== */
+function populateFactionSelect(selected){
+  const sel = document.getElementById('fFaction');
+  sel.innerHTML = '';
+  factions.forEach(f=>{
+    const opt = document.createElement('option');
+    opt.value = f; opt.textContent = f;
+    if(f === selected) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function populateRanks(faction, selected){
+  const sel = document.getElementById('fRank');
+  sel.innerHTML = '';
+  (rankLists[faction] || ['None']).forEach(r=>{
+    const opt = document.createElement('option');
+    opt.value = r; opt.textContent = r;
+    if(r === selected) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+document.getElementById('fFaction').addEventListener('change', e => populateRanks(e.target.value, null));
+
+/* ======================
+   Search box
+   ====================== */
 document.getElementById('searchBox').addEventListener('input', e=>{
   const q = e.target.value.trim().toLowerCase();
-  cards.forEach(c=>{
-    const el = document.getElementById(c.id);
+  Object.values(cards).forEach(n=>{
+    const el = document.getElementById('card-'+n.id);
     if(!el) return;
-    const txt = `${c.data.name || ''} ${c.data.branch || ''} ${c.data.rank || ''}`.toLowerCase();
-    el.style.display = (!q || txt.includes(q)) ? 'flex' : 'none';
-  });
-  textBoxes.forEach(t=>{
-    const el = document.getElementById(t.id);
-    if(!el) return;
-    const txt = (t.content || '').toLowerCase();
-    el.style.display = (!q || txt.includes(q)) ? 'block' : 'none';
+    const text = ((n.data && (n.data.name + ' ' + n.data.faction + ' ' + (n.data.rank||''))) || (n.data && n.data.name) || '').toLowerCase();
+    el.style.display = (!q || text.includes(q)) ? 'flex' : 'none';
   });
 });
 
-/* =============================
-   Autosave toggle (optional)
-   ============================= */
-let autosaveEnabled = false, autosaveInterval = null;
-function toggleAutosave(enabled){
-  autosaveEnabled = !!enabled;
-  if(autosaveEnabled){
-    autosaveInterval = setInterval(()=>{ if(currentWeb) saveCurrentWeb(); }, 5000);
-    toast('Autosave ON');
-  } else {
-    clearInterval(autosaveInterval);
-    autosaveInterval = null;
-    toast('Autosave OFF');
-  }
+/* ======================
+   Keyboard shortcuts
+   ====================== */
+window.addEventListener('keydown', e=>{
+  if((e.ctrlKey || e.metaKey) && e.key === 'z'){ e.preventDefault(); undo(); }
+  if((e.ctrlKey || e.metaKey) && e.key === 'y'){ e.preventDefault(); redo(); }
+  if(e.key === 'Delete' || e.key === 'Backspace'){ if(selectedId) document.getElementById('deleteSelectedBtn').click(); }
+});
+
+/* ======================
+   Realtime: sync individual node/edge changes from firebase to local (optional)
+   This app listens to 'orgchart' root once above; to keep both in sync we write when we change.
+   ====================== */
+
+/* ======================
+   Initial setup: load orgchart once, and render
+   ====================== */
+function init(){
+  // initial render
+  renderAll();
+  // last web
+  const last = localStorage.getItem('lastWeb');
+  if(last) { webNameInput.value = last; }
+  // keyboard friendly focus
+  document.getElementById('addProfileBtn').focus();
 }
+init();
 
-/* =============================
-   Helper: snap all cards by rank (call if needed)
-   ============================= */
-function snapAll(){
-  cards.forEach(c=> doSnapForCard(c));
-  render();
-}
-
-/* =============================
-   Expose some functions for console debugging
-   ============================= */
-window._cw = {
-  cards, textBoxes, edges, render, saveCurrentWeb, subscribeToWeb, refreshWebList, exportJSON, exportPNG, snapAll, toggleAutosave
-};
-
-/* Final render */
-render();
+/* Expose for debugging */
+window.__cw = { cards, edges, textBoxes, renderAll, snapshot, undo, redo, saveWorkspace, loadWorkspace, refreshWorkspaceList };
 
 </script>
 </body>
