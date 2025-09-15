@@ -50,7 +50,7 @@ html, body { margin:0; padding:0; height:100%; background:#121212; color:#e0e0e0
 .alive { background:#4caf50; }
 .dead { background:#e53935; }
 .unknown { background:#212121; border:1.5px solid #78909c; }
-.anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:-6px; left:50%; transform:translate(-50%, -50%); z-index:20; cursor:crosshair; }
+.anchor { position:absolute; width:14px; height:14px; border-radius:50%; background:#ffd54f; border:2px solid #333; top:-18px; left:50%; transform:translate(-50%, -50%); z-index:20; cursor:crosshair; }
 /* Editor side panel */
 #editor { position:fixed; top:0; right:0; width:360px; height:100%; background:#1c1c1c; color:#eee;
   box-shadow:-6px 0 20px rgba(0,0,0,0.6); z-index:300000; display:none; padding:14px; overflow-y:auto; }
@@ -291,7 +291,7 @@ function updateEdges() {
     line.setAttribute("y1", posA.y);
     line.setAttribute("x2", posB.x);
     line.setAttribute("y2", posB.y);
-    line.setAttribute("stroke", "#ffd54f");
+    line.setAttribute("stroke", "#b0aeae");
     line.setAttribute("stroke-width", "4");
     line.setAttribute("stroke-linecap", "round");
     line.setAttribute("opacity", "0.9");
@@ -502,7 +502,9 @@ function loadState(state) {
   ty = state.ty || 0;
   scale = state.scale || 1;
   applyTransform();
+  render();   // ✅ re-render DOM after restoring state
 }
+
 
 function undo() {
   if (undoStack.length === 0) { toast("Nothing to undo"); return; }
@@ -510,11 +512,11 @@ function undo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     redoStack.push(current);
     const prev = undoStack.pop();
-    loadState(prev);
-    render();
+    loadState(prev);   // loadState already calls render()
     toast("Undo");
   } catch (e) { console.error(e); }
 }
+
 
 function redo() {
   if (redoStack.length === 0) { toast("Nothing to redo"); return; }
@@ -522,27 +524,28 @@ function redo() {
     const current = JSON.parse(JSON.stringify({ cards, edges, textBoxes, tx, ty, scale }));
     undoStack.push(current);
     const nxt = redoStack.pop();
-    loadState(nxt);
-    render();
+    loadState(nxt);  // loadState now does render()
     toast("Redo");
   } catch (e) { console.error(e); }
 }
 
+
 /* ---------- Selection / Editor ---------- */
 function deselect() {
-  if(selected){
+  if (selected) {
     let el = document.getElementById(selected);
-    if(el) el.classList.remove("selected");
+    if (el) el.classList.remove("selected");
     selected = null; selectedType = null;
   }
   closeEditor();
 }
 function closeEditor() { document.getElementById("editor").style.display = "none"; }
 
-function openEditor(id, type){
+function openEditor(id, type) {
   let ed = document.getElementById("editor");
   ed.style.display = "block";
-  // Clear fields
+
+  // Reset all fields
   document.getElementById("fImage").value = "";
   document.getElementById("fName").value = "";
   fillBranchSelect("None");
@@ -560,11 +563,15 @@ function openEditor(id, type){
   document.getElementById("fRelatedFile").value = "";
   document.getElementById("fOtherFile").value = "";
 
-  selected = id; selectedType = type;
+  selected = id; 
+  selectedType = type;
 
-  if(type === "card"){
+  if (type === "card") {
+    // Show everything
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "");
+
     const card = cards.find(c => c.id === id);
-    if(!card) return;
+    if (!card) return;
     document.getElementById("fImage").value = card.data.image || "";
     document.getElementById("fName").value = card.data.name || "";
     fillBranchSelect(card.data.branch);
@@ -574,44 +581,54 @@ function openEditor(id, type){
     document.getElementById("fDesc").value = card.data.desc || "";
     renderFileList("relatedList", card.data.relatedFiles);
     renderFileList("otherList", card.data.otherFiles);
-  } else if(type === "textbox"){
+  } 
+  else if (type === "textbox") {
+    // Hide everything except header + description label + textarea
+    document.querySelectorAll("#editor *").forEach(el => el.style.display = "none");
+    document.querySelector("#editor header").style.display = "block";
+
+    const descLabel = Array.from(document.querySelectorAll("#editor label"))
+      .find(l => l.textContent.includes("Short Description"));
+    if (descLabel) descLabel.style.display = "block";
+
+    document.getElementById("fDesc").style.display = "block";
+
     const box = textBoxes.find(t => t.id === id);
-    if(!box) return;
-    document.getElementById("fDesc").value = box.content || "";
+    if (box) document.getElementById("fDesc").value = box.content || "";
   }
 }
 
 function fillBranchSelect(selectedBranch) {
   const sel = document.getElementById("fBranch");
   sel.innerHTML = "";
-  Object.keys(branchColors).forEach(b=>{
+  Object.keys(branchColors).forEach(b => {
     const opt = document.createElement("option");
     opt.value = b; opt.textContent = b;
-    if(b === selectedBranch) opt.selected = true;
+    if (b === selectedBranch) opt.selected = true;
     sel.appendChild(opt);
   });
 }
-function fillRankSelect(branch, selectedRank){
+function fillRankSelect(branch, selectedRank) {
   const sel = document.getElementById("fRank");
   sel.innerHTML = "";
-  (rankLists[branch] || ['None']).forEach(r=>{
+  (rankLists[branch] || ['None']).forEach(r => {
     const opt = document.createElement("option");
     opt.value = r; opt.textContent = r;
-    if(r === selectedRank) opt.selected = true;
+    if (r === selectedRank) opt.selected = true;
     sel.appendChild(opt);
   });
 }
-function renderFileList(containerId, files){
+function renderFileList(containerId, files) {
   const cont = document.getElementById(containerId);
   cont.innerHTML = "";
-  if(!files || files.length === 0){
+  if (!files || files.length === 0) {
     cont.textContent = "(none)";
     return;
   }
   const ul = document.createElement('ul');
   ul.style.margin = '6px 0 0 0';
   ul.style.paddingLeft = '18px';
-  files.forEach(f=>{
+  files.forEach(f => {
     const li = document.createElement('li');
     const a = document.createElement("a");
     a.href = f.url || f;
@@ -622,6 +639,7 @@ function renderFileList(containerId, files){
   });
   cont.appendChild(ul);
 }
+
 
 // Editor: URL and local files handlers
 document.getElementById("btnAddRelated").onclick = ()=>{
