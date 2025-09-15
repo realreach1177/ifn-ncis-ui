@@ -209,13 +209,27 @@ const branchColors = {
 };
 const rankLists = {
   "None":["None"],
-  "United States Army": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"],
-  "United States Navy": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"],
-  "United States Marine Corps": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"],
-  "United States Air Force": ["US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"],
-  "Taliban": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"],
-  "Taliban Special Forces": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"],
-  "Al-Qaeda": ["Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB","AKR"]
+  "United States Army": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "SMA", "CSM", "1SG", "SFC", "SSGT", "SGT", "CPL", "PFC", "PV2", "PVT"
+  ],
+  "United States Navy": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "CAPT", "CDR", "LCDR", "LT", "LTJG", "ENS", "MCPON", "MCPO", "SCPO", "CPO", "PO1", "PO2", "PO3", "SN", "SA", "SR"
+  ],
+  "United States Marine Corps": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LtCol", "Maj", "Cpt", "1stLt", "2ndLt", "SgtMajMC", "MGySgt", "MSgt", "GySgt", "SSgt", "Sgt", "Cpl", "LCpl", "PFC", "Pvt"
+  ],
+  "United States Air Force": [
+    "US General", "US Lieutenant General", "US Major General", "Commander", "XO", "COL", "LTC", "MAJ", "CPT", "1LT", "2LT", "CMSAF", "CMSgt", "SMSgt", "MSgt", "TSgt", "SSgt", "SrA", "A1C", "Amn", "AB"
+  ],
+  "Taliban": [
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
+  ],
+  "Taliban Special Forces": [
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII"
+  ],
+  "Al-Qaeda": [
+    "Deputy General","Governor","Minister of Justice","Minister of Attack","Minister of Red Unit", "Alqayid","QaR","QaGL","DaGn","JaG","TOR","BKoT","BK","BB","BV","BIV","BIII","BII","BR","SB"
+  ]
 };
 
 // Utilities
@@ -280,7 +294,6 @@ function makeCardView(card) {
   c.addEventListener('click', e => {
     e.stopPropagation();
     if (editingTextLabel) return;
-    // Prevent clicks from contentEditable elements
     const path = e.composedPath ? e.composedPath() : [];
     if (path.some(n => n && n.nodeType === 1 && n.isContentEditable)) return;
 
@@ -339,7 +352,68 @@ function makeTextBoxView(box) {
   t.style.minHeight = '50px';
   t.style.width = box.width ? box.width + 'px' : '300px';
 
- // Define renderMinimap function outside event listeners
+  // Local dragging state
+  let dragging = false;
+  let offset = { x: 0, y: 0 };
+
+  t.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    dragging = true;
+    t.classList.add('dragging');
+    t.setPointerCapture(e.pointerId);
+    const wp = clientToWorld(e.clientX, e.clientY);
+    offset.x = wp.x - box.x;
+    offset.y = wp.y - box.y;
+  });
+
+  t.addEventListener('pointermove', e => {
+    if(!dragging || !(t.hasPointerCapture && t.hasPointerCapture(e.pointerId))) return;
+    const wp = clientToWorld(e.clientX, e.clientY);
+    box.x = snapToGrid(wp.x - offset.x);
+    box.y = snapToGrid(wp.y - offset.y);
+    t.style.left = box.x + 'px';
+    t.style.top = box.y + 'px';
+    renderMinimap();
+  });
+
+  t.addEventListener('pointerup', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    try { t.releasePointerCapture(e.pointerId); } catch {}
+    snapshot();
+  });
+
+  t.addEventListener('pointercancel', e => {
+    dragging = false;
+    t.classList.remove('dragging');
+    try { t.releasePointerCapture(e.pointerId); } catch {}
+  });
+
+  t.addEventListener('input', e => {
+    editingTextLabel = true;
+    box.content = t.textContent;
+  });
+
+  t.addEventListener('focus', e => { editingTextLabel = true; });
+  t.addEventListener('blur', e => { editingTextLabel = false; });
+
+  t.addEventListener('click', e => {
+    e.stopPropagation();
+    if(selected){ 
+      const prev = document.getElementById(selected); 
+      if(prev) prev.classList.remove('selected'); 
+    }
+    selected = box.id;
+    selectedType = 'textbox';
+    t.classList.add('selected');
+    openEditor(box.id, 'textbox');
+  });
+
+  cardsLayer.appendChild(t);
+  return t;
+}
+
+// --- Only one renderMinimap function, at top level
 function renderMinimap() {
   minimapSVG.innerHTML = "";
   const minimapWidth = 220;
@@ -358,6 +432,39 @@ function renderMinimap() {
     maxX = Math.max(maxX, t.x + (t.width || 300));
     maxY = Math.max(maxY, t.y + 60);
   });
+  
+  if (minX === Infinity) {
+    minX = 0; minY = 0; maxX = 1000; maxY = 800;
+  }
+
+  const workspaceWidth = maxX - minX;
+  const workspaceHeight = maxY - minY;
+  const scaleX = minimapWidth / workspaceWidth;
+  const scaleY = minimapHeight / workspaceHeight;
+  const scale = Math.min(scaleX, scaleY);
+
+  cards.forEach(c => {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", (c.x - minX) * scale);
+    rect.setAttribute("y", (c.y - minY) * scale);
+    rect.setAttribute("width", 360 * scale);
+    rect.setAttribute("height", 120 * scale);
+    rect.setAttribute("fill", (c.data.branchColor || "#777"));
+    rect.setAttribute("fill-opacity", "0.9");
+    minimapSVG.appendChild(rect);
+  });
+
+  textBoxes.forEach(t => {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", (t.x - minX) * scale);
+    rect.setAttribute("y", (t.y - minY) * scale);
+    rect.setAttribute("width", (t.width || 300) * scale);
+    rect.setAttribute("height", 60 * scale);
+    rect.setAttribute("fill", "#999");
+    rect.setAttribute("fill-opacity", "0.7");
+    minimapSVG.appendChild(rect);
+  });
+}
   
   if (minX === Infinity) {
     minX = 0; minY = 0; maxX = 1000; maxY = 800;
