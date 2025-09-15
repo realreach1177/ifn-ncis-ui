@@ -275,17 +275,28 @@ function linkListHTML(files) {
    NOTE: replaced DOM-measurement approach with model-based computation so lines don't split
    when zooming/panning. Cards are stored in 'cards' with x,y being world coords (top-left). */
 function anchorCenter(cardId) {
-  const card = cards.find(c => c.id === cardId);
-  if (!card) return null;
-  // Card width is 360 in CSS; anchor is centered horizontally on top.
-  // Use card model coords to compute anchor center in world coordinates.
-  const cardWidth = 360;
-  // Anchor visually is a bit above the card (top:-6px + transform), but
-  // using card.y is a stable "top edge" reference. You can tweak offset if needed.
-  const anchorX = card.x + cardWidth / 2;
-  const anchorY = card.y; // top edge of the card (anchor sits around here)
-  return { x: anchorX, y: anchorY };
+  const cardEl = document.getElementById(cardId);
+  if (!cardEl) return null;
+
+  // find the actual anchor dot
+  const anchorEl = cardEl.querySelector('.anchor');
+  if (!anchorEl) return null;
+
+  // get its bounding box
+  const rectAnchor = anchorEl.getBoundingClientRect();
+  const rectViewport = viewport.getBoundingClientRect();
+
+  // calculate the dot center in screen space
+  const ax = (rectAnchor.left + rectAnchor.right) / 2 - rectViewport.left;
+  const ay = (rectAnchor.top + rectAnchor.bottom) / 2 - rectViewport.top;
+
+  // convert screen px → world coords
+  return {
+    x: (ax - tx) / scale,
+    y: (ay - ty) / scale
+  };
 }
+
 
 function updateEdges() {
   // Clear existing
